@@ -1,0 +1,30 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# dependencies
+node_modules/
+
+# build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# logs
+logs/
+*.log
+npm-debug.log*
+
+# local databases / state
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
