@@ -14,6 +14,7 @@ export const config = {
   // protobuf-only, deferred past M0).
   raydiumPollMs: num("RAYDIUM_POLL_MS", 4000),
   mexcPollMs: num("MEXC_POLL_MS", 2000),
+  bybitPollMs: num("BYBIT_POLL_MS", 2000),
 
   // Minimum net spread (after fees) to log as an opportunity, in bps.
   minNetSpreadBps: num("MIN_NET_SPREAD_BPS", 5),
@@ -24,6 +25,9 @@ export const config = {
 
   // MEXC default spot taker fee (0.1% = 10 bps); override per your account tier.
   mexcTakerFeeBps: num("MEXC_TAKER_FEE_BPS", 10),
+
+  // Bybit default spot taker fee (0.1% = 10 bps); override per your account tier.
+  bybitTakerFeeBps: num("BYBIT_TAKER_FEE_BPS", 10),
 
   // FR-2.5 / scenario 27: flag spreads implausibly large as likely stale/broken
   // data rather than real profit, pending independent confirmation.

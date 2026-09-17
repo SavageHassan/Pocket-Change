@@ -1,10 +1,12 @@
 import { RaydiumAdapter } from "./adapters/dex/raydium.js";
 import { MexcAdapter } from "./adapters/cex/mexc.js";
+import { BybitAdapter } from "./adapters/cex/bybit.js";
 import { IngestionService } from "./ingestion/ingestionService.js";
 import { scanForOpportunities } from "./engine/opportunityDetector.js";
 import { runPaperTradingCycle } from "./engine/paperTradingEngine.js";
 import { KillSwitch } from "./monitoring/killswitch.js";
 import { PnLTracker } from "./monitoring/pnlTracker.js";
+import { UnwindTracker } from "./monitoring/unwindTracker.js";
 import { logger } from "./monitoring/logger.js";
 import { config } from "./config/env.js";
 
@@ -20,15 +22,21 @@ function parseMode(): Mode {
   return value;
 }
 
+function parseStressTest(): boolean {
+  return process.argv.includes("--stress-test");
+}
+
 const SCAN_INTERVAL_MS = 3000;
-const PNL_SUMMARY_EVERY_N_SCANS = 5;
+const SUMMARY_EVERY_N_SCANS = 5;
 
 function buildIngestion(): IngestionService {
   const raydium = new RaydiumAdapter();
   const mexc = new MexcAdapter();
-  return new IngestionService([raydium, mexc], {
+  const bybit = new BybitAdapter();
+  return new IngestionService([raydium, mexc, bybit], {
     raydium: config.raydiumPollMs,
     mexc: config.mexcPollMs,
+    bybit: config.bybitPollMs,
   });
 }
 
@@ -67,38 +75,49 @@ async function runDetectMode(): Promise<void> {
   });
 }
 
-async function runPaperMode(): Promise<void> {
+async function runPaperMode(stressTest: boolean): Promise<void> {
   const ingestion = buildIngestion();
   const killSwitch = new KillSwitch();
   const pnlTracker = new PnLTracker();
+  const unwindTracker = new UnwindTracker();
 
   ingestion.start();
-  logger.system("M1 paper trading mode started", {
+  logger.system("M1/M2 paper trading mode started", {
     venues: ingestion.listVenueIds(),
     scanIntervalMs: SCAN_INTERVAL_MS,
     tradeSizeUsd: config.paperTradeSizeUsd,
+    stressTest,
   });
   console.log(`paper trading mode — simulating $${config.paperTradeSizeUsd} trades against live order-book/pool depth. No real orders are placed.`);
+  if (stressTest) {
+    console.log("*** --stress-test ACTIVE: leg fills are being synthetically corrupted to exercise the FR-5.4 unwind path. Not real market behavior. ***");
+  }
 
   let scanCount = 0;
   const scanLoop = setInterval(async () => {
     killSwitch.pollFileFlag();
     if (killSwitch.isTripped()) return;
 
-    const trades = await runPaperTradingCycle(ingestion, pnlTracker);
+    const trades = await runPaperTradingCycle(ingestion, pnlTracker, unwindTracker, { injectFailures: stressTest });
     for (const t of trades) {
       const sign = t.realizedPnlUsd >= 0 ? "+" : "";
+      const mismatch = Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9 ? " [LEG MISMATCH -> UNWOUND]" : "";
       console.log(
         `[${new Date().toISOString()}] paper trade: ${t.assetId} buy@${t.buyVenueId} -> sell@${t.sellVenueId}, ` +
-          `matched=${t.matchedQty.toFixed(4)}, theoretical=${t.theoreticalNetSpreadBps.toFixed(1)}bps, realized=${sign}$${t.realizedPnlUsd.toFixed(4)}`,
+          `matched=${t.matchedQty.toFixed(4)}, theoretical=${t.theoreticalNetSpreadBps.toFixed(1)}bps, realized=${sign}$${t.realizedPnlUsd.toFixed(4)}${mismatch}`,
       );
     }
 
     scanCount += 1;
-    if (scanCount % PNL_SUMMARY_EVERY_N_SCANS === 0 && pnlTracker.tradeCount() > 0) {
+    if (scanCount % SUMMARY_EVERY_N_SCANS === 0 && pnlTracker.tradeCount() > 0) {
       console.log(`--- P&L summary (${pnlTracker.tradeCount()} simulated trades, total realized $${pnlTracker.totalRealizedPnlUsd().toFixed(4)}) ---`);
       for (const s of pnlTracker.summary()) {
         console.log(`  ${s.key}: ${s.trades} trades, theoretical $${s.theoreticalPnlUsd.toFixed(4)}, realized $${s.realizedPnlUsd.toFixed(4)}`);
+      }
+      if (unwindTracker.count() > 0) {
+        console.log(
+          `--- Unwind summary (FR-5.4/7.5): ${unwindTracker.count()} events, ${unwindTracker.incompleteFlattenCount()} incomplete, total realized loss $${unwindTracker.totalRealizedLossUsd().toFixed(4)} ---`,
+        );
       }
     }
   }, SCAN_INTERVAL_MS);
@@ -106,9 +125,11 @@ async function runPaperMode(): Promise<void> {
   killSwitch.onTrip(() => {
     clearInterval(scanLoop);
     ingestion.stop();
-    logger.system("M1 paper trading mode stopped (kill switch)", {
+    logger.system("M1/M2 paper trading mode stopped (kill switch)", {
       totalTrades: pnlTracker.tradeCount(),
       totalRealizedPnlUsd: pnlTracker.totalRealizedPnlUsd(),
+      totalUnwindEvents: unwindTracker.count(),
+      incompleteUnwinds: unwindTracker.incompleteFlattenCount(),
     });
     process.exit(0);
   });
@@ -117,7 +138,7 @@ async function runPaperMode(): Promise<void> {
 async function main() {
   const mode = parseMode();
   if (mode === "paper") {
-    await runPaperMode();
+    await runPaperMode(parseStressTest());
     return;
   }
   await runDetectMode();

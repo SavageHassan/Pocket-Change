@@ -19,6 +19,13 @@ export interface AssetConfig {
   mexc: {
     symbol: string;
   };
+  // Optional: not every asset lists on every CEX. RAY, for example, isn't on
+  // Bybit — a small, real instance of the SRS's own point that "all coins"
+  // is a filter/availability problem, not a given. Adapters and the
+  // detector already skip a (venue, asset) pair with no mapping.
+  bybit?: {
+    symbol: string;
+  };
 }
 
 export const ASSET_UNIVERSE: AssetConfig[] = [
@@ -31,6 +38,9 @@ export const ASSET_UNIVERSE: AssetConfig[] = [
       mintB: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
     },
     mexc: {
+      symbol: "SOLUSDT",
+    },
+    bybit: {
       symbol: "SOLUSDT",
     },
   },

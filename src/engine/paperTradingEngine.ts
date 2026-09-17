@@ -3,15 +3,25 @@ import { config } from "../config/env.js";
 import type { IngestionService } from "../ingestion/ingestionService.js";
 import { logger } from "../monitoring/logger.js";
 import type { PnLTracker } from "../monitoring/pnlTracker.js";
+import type { UnwindTracker } from "../monitoring/unwindTracker.js";
 import { scanForOpportunities } from "./opportunityDetector.js";
 import { simulateCexFill, simulateDexFill } from "./fillSimulator.js";
+import { simulateUnwind } from "./unwindSimulator.js";
+import { maybeInjectFailure } from "./legFailureInjector.js";
 
 /**
- * M1 paper trading (FR-9.1): for every opportunity that clears the profit
- * threshold, re-price it through realistic fill simulation instead of
- * assuming full fill at the quoted price, and record the hypothetical
- * result. No orders are placed anywhere — this only reads the same public
- * data M0 already polls and does arithmetic on it.
+ * M1 (FR-9.1): for every opportunity that clears the profit threshold,
+ * re-price it through realistic fill simulation instead of assuming full
+ * fill at the quoted price.
+ *
+ * M2 adds: optional deliberate leg-failure injection (`options.injectFailures`,
+ * wired to the `--stress-test` CLI flag — never on by default), and an
+ * actual simulated unwind ACTION (FR-5.4) when the two legs mismatch —
+ * not just a logged observation. The unwind's realized cost is folded into
+ * the trade's P&L, since flattening a naked position isn't free.
+ *
+ * No orders are placed anywhere — this only reads public data and injected
+ * synthetic failures, and does arithmetic on them.
  */
 
 let counter = 0;
@@ -24,13 +34,22 @@ function isDex(quote: NormalizedQuote): boolean {
   return quote.dexReserves !== undefined;
 }
 
-/** Explicit fee in quote-asset units. DEX fees are already embedded in simulateDexFill's avgPrice, so they're 0 here to avoid double-counting. */
+/** Explicit fee in quote-asset units, on whatever the leg actually executed. DEX fees are already embedded in simulateDexFill's avgPrice, so they're 0 here to avoid double-counting. */
 function explicitFeeUsd(quote: NormalizedQuote, filledQty: number, avgPrice: number): number {
-  if (isDex(quote)) return 0;
+  if (isDex(quote) || filledQty <= 0) return 0;
   return filledQty * avgPrice * (quote.feeSchedule.takerBps / 10000);
 }
 
-export async function runPaperTradingCycle(ingestion: IngestionService, pnlTracker: PnLTracker): Promise<PaperTrade[]> {
+export interface PaperTradingOptions {
+  injectFailures?: boolean;
+}
+
+export async function runPaperTradingCycle(
+  ingestion: IngestionService,
+  pnlTracker: PnLTracker,
+  unwindTracker: UnwindTracker,
+  options: PaperTradingOptions = {},
+): Promise<PaperTrade[]> {
   const opportunities = await scanForOpportunities(ingestion); // already logs each candidate
   const trades: PaperTrade[] = [];
 
@@ -41,19 +60,26 @@ export async function runPaperTradingCycle(ingestion: IngestionService, pnlTrack
 
     const qtyBase = config.paperTradeSizeUsd / opp.buyPrice;
 
-    const buyFill = isDex(buyEntry.quote)
-      ? simulateDexFill(buyEntry.quote, "buy", qtyBase)
-      : simulateCexFill(buyEntry.quote, "buy", qtyBase);
-    const sellFill = isDex(sellEntry.quote)
-      ? simulateDexFill(sellEntry.quote, "sell", qtyBase)
-      : simulateCexFill(sellEntry.quote, "sell", qtyBase);
+    let buyFill = isDex(buyEntry.quote) ? simulateDexFill(buyEntry.quote, "buy", qtyBase) : simulateCexFill(buyEntry.quote, "buy", qtyBase);
+    let sellFill = isDex(sellEntry.quote) ? simulateDexFill(sellEntry.quote, "sell", qtyBase) : simulateCexFill(sellEntry.quote, "sell", qtyBase);
+
+    if (options.injectFailures) {
+      // Corrupt exactly one side per trade — this is what forces the
+      // one-leg-fills-one-doesn't scenario FR-5.4 exists for, deterministically
+      // enough to actually exercise the unwind path (natural depth-driven
+      // mismatches at $500 trade size are rare against these pools/books).
+      if (Math.random() < 0.5) {
+        buyFill = maybeInjectFailure(buyFill);
+      } else {
+        sellFill = maybeInjectFailure(sellFill);
+      }
+    }
+
+    if (buyFill.filledQty <= 0 && sellFill.filledQty <= 0) continue; // nothing happened on either side — nothing to record
 
     const matchedQty = Math.min(buyFill.filledQty, sellFill.filledQty);
-    if (matchedQty <= 0) continue; // nothing fillable on one or both sides — no trade to record
-
     const grossPnl = matchedQty * (sellFill.avgPrice - buyFill.avgPrice);
-    const feesUsd = explicitFeeUsd(buyEntry.quote, matchedQty, buyFill.avgPrice) + explicitFeeUsd(sellEntry.quote, matchedQty, sellFill.avgPrice);
-    const realizedPnlUsd = grossPnl - feesUsd;
+    const feesUsd = explicitFeeUsd(buyEntry.quote, buyFill.filledQty, buyFill.avgPrice) + explicitFeeUsd(sellEntry.quote, sellFill.filledQty, sellFill.avgPrice);
 
     const trade: PaperTrade = {
       id: nextId(),
@@ -67,26 +93,29 @@ export async function runPaperTradingCycle(ingestion: IngestionService, pnlTrack
       sellFill,
       matchedQty,
       feesUsd,
-      realizedPnlUsd,
+      realizedPnlUsd: 0, // filled in below, after any unwind cost is known
     };
+
+    // FR-5.4: the legs mismatched (a total or partial single-leg failure) —
+    // immediately flatten the resulting exposure rather than leave it naked.
+    const unwind = simulateUnwind(trade.id, opp.assetId, buyEntry.quote, sellEntry.quote, buyFill, sellFill);
+    let unwindLoss = 0;
+    if (unwind) {
+      unwindLoss = unwind.event.realizedLoss;
+      unwindTracker.record(unwind.event, unwind.fullyFlattened);
+      logger.unwind({
+        ...unwind.event,
+        fullyFlattened: unwind.fullyFlattened,
+        buyFilledQty: buyFill.filledQty,
+        sellFilledQty: sellFill.filledQty,
+      });
+    }
+
+    trade.realizedPnlUsd = grossPnl - feesUsd - unwindLoss;
 
     logger.paperTrade(trade);
     pnlTracker.record(trade);
     trades.push(trade);
-
-    // Simulated fills mismatching in size is the paper-mode analog of FR-5.4's
-    // trigger condition (one leg fills more than the other). M1 only detects
-    // and logs it here; M2 is where leg failures are deliberately injected
-    // and an actual unwind action is simulated per your milestone plan.
-    if (Math.abs(buyFill.filledQty - sellFill.filledQty) > 1e-9) {
-      logger.unwind({
-        tradeId: trade.id,
-        reason: "simulated leg fill mismatch",
-        buyFilledQty: buyFill.filledQty,
-        sellFilledQty: sellFill.filledQty,
-        unmatchedQty: Math.abs(buyFill.filledQty - sellFill.filledQty),
-      });
-    }
   }
 
   return trades;

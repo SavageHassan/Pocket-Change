@@ -1,25 +1,28 @@
 # crypto-arb-bot
 
 Multi-venue crypto arbitrage bot, built per `SRS_MultiExchange_Arbitrage_Bot_v2.md`
-(v2 SRS). Currently at **M1**: live market data ingestion, opportunity
-detection, and paper trading with realistic fill simulation. No wallet, no
-exchange API keys, no order placement anywhere in these milestones.
+(v2 SRS). Currently at **M2**: live market data ingestion across three
+venues, opportunity detection, paper trading with realistic fill
+simulation, and a stress-tested unwind procedure. No wallet, no exchange
+API keys, no order placement anywhere in these milestones.
 
-## Status: M1 complete
+## Status: M2 complete
 
-- Venues: [Raydium](https://raydium.io) (Solana DEX) + [MEXC](https://www.mexc.com) (CEX)
-- Assets: SOL/USDT, RAY/USDT (see `src/config/assets.ts` — adding an asset is a config edit, not a code change)
+- Venues: [Raydium](https://raydium.io) (Solana DEX) + [MEXC](https://www.mexc.com) + [Bybit](https://www.bybit.com) (CEXs)
+- Assets: SOL/USDT (all three venues), RAY/USDT (Raydium + MEXC — not listed on Bybit; see `src/config/assets.ts`, adding an asset/venue is a config edit + one adapter file, not a core change)
 - **M0:** detects cross-venue price spreads, computes fee-adjusted net spread, logs every opportunity (profitable or not) as structured JSON
-- **M1:** every opportunity that clears the profit threshold is re-priced through realistic fill simulation — order-book depth walk for MEXC, pool-slippage model for Raydium — and the hypothetical result (matched quantity, fees, realized P&L) is logged and tracked per venue-pair
-- Still no trading — both milestones only observe, simulate, and log
+- **M1:** every opportunity that clears the profit threshold is re-priced through realistic fill simulation — order-book depth walk for CEX legs, pool-slippage model for the Raydium leg — and the hypothetical result (matched quantity, fees, realized P&L) is logged and tracked per venue-pair
+- **M2:** second CEX adapter (Bybit) live; `--stress-test` deliberately corrupts leg fills to exercise FR-5.4's unwind procedure on demand, which now actually simulates the offsetting order (not just logs the mismatch) and tracks whether the exposure was fully flattened
+- Still no trading — all three milestones only observe, simulate, and log
 
 ## Setup
 
 ```bash
 npm install
-cp .env.example .env   # optional — defaults work with no keys through M1
-npm start                        # M0: detection mode (default)
-npm start -- --mode=paper        # M1: paper trading mode
+cp .env.example .env   # optional — defaults work with no keys through M2
+npm start                                      # M0: detection mode (default)
+npm start -- --mode=paper                      # M1: paper trading mode
+npm start -- --mode=paper --stress-test        # M2: paper trading with injected leg failures
 ```
 
 You'll see console lines only when a net-positive-or-notable spread appears
@@ -40,6 +43,7 @@ Stop with `Ctrl+C`, or by creating a `KILL_SWITCH` file in the project root
 
 - `npm start` / `--mode=detect` — **M0, implemented.** Live detection + logging only.
 - `--mode=paper` — **M1, implemented.** Simulates fills for every opportunity that clears the profit threshold and tracks hypothetical P&L. No orders are ever placed.
+- `--mode=paper --stress-test` — **M2, implemented.** Same as paper mode, but deliberately corrupts one leg's fill on ~80% of trades (0% or a random partial fraction) to force the FR-5.4 unwind path to fire reliably, instead of waiting on the rare natural mismatches real order-book/pool depth produces at $500 trade size. Console-tagged `[LEG MISMATCH -> UNWOUND]` and structured-logged as `event: "unwind"` with whether the exposure was fully flattened.
 
 ## How M1's fill simulation works
 
@@ -56,36 +60,54 @@ Stop with `Ctrl+C`, or by creating a `KILL_SWITCH` file in the project root
 - **P&L tracking (FR-7.6):** `monitoring/pnlTracker.ts` accumulates
   theoretical vs. realized P&L per (asset, buy-venue, sell-venue), printed
   as a running summary every 5 scan cycles in paper mode.
-- **Leg-mismatch detection:** when the two simulated legs fill different
-  quantities (e.g. the CEX side runs out of book depth before the DEX side's
-  full amount), it's logged as an `unwind` event — the paper-mode analog of
-  FR-5.4's trigger condition. M1 only detects and logs this; **M2** is where
-  leg failures are deliberately injected and an actual unwind action is
-  simulated, per your milestone plan.
+## How M2's unwind procedure works (FR-5.4)
 
-## Path to M2 (second CEX + unwind stress-testing)
+`engine/unwindSimulator.ts` is called after every simulated trade. If the two
+legs' filled quantities don't match:
 
-M2 needs, on top of what exists:
-1. A second `VenueAdapter` implementation (CEX #2) — the adapter interface
-   and ingestion service already support N venues, so this is a new file in
-   `adapters/cex/`, not a core change.
-2. Deliberate leg-failure injection in paper mode (e.g. force one leg to
-   receive 0% or partial fill regardless of real book depth) to stress-test
-   the unwind path beyond the natural mismatches M1 already detects.
-3. An actual simulated unwind *action* (FR-5.4) — M1 only logs the mismatch;
-   M2 needs to simulate placing the offsetting order and confirm the
-   resulting exposure is flattened, not just flagged.
+1. Compute the net exposure (`buyFill.filledQty - sellFill.filledQty`).
+2. If positive (bought more than sold — naked long), simulate selling the
+   excess immediately **on the buy venue**, where the fill happened.
+3. If negative (sold more than bought — naked short), simulate buying back
+   the excess immediately **on the sell venue**.
+4. The unwind's own slippage cost is folded into the trade's `realizedPnlUsd`
+   — flattening a naked position isn't free, and pretending otherwise would
+   understate real risk.
+5. If the unwind order itself can't fully fill (the book/pool doesn't have
+   enough depth to absorb it), the event is marked `fullyFlattened: false`
+   and the `actionTaken` string says so explicitly — a real tail risk, not
+   swept under the rug.
 
-None of this needs API keys — M2 paper-mode stress-testing still runs
-entirely against public data plus injected failure scenarios.
+`monitoring/unwindTracker.ts` (FR-7.5) accumulates event count, incomplete-
+flatten count, and total realized unwind loss, printed alongside the P&L
+summary. A verification run with `--stress-test` (see below) produced 35
+unwind events across 40 trades, 34 fully flattened and 1 incomplete — every
+mismatch got a response, none were left as a silent naked position.
+
+## Path to M3 (devnet/testnet execution)
+
+M3 needs, on top of what exists:
+1. A Solana devnet wallet + RPC connection, and real atomic transaction
+   building for the Raydium leg (FR-4.1/4.3) — simulate-before-submit, with
+   an on-chain minimum-output guard, using devnet funds only.
+2. Real order submission to MEXC/Bybit sandbox or testnet APIs, if
+   available for spot (needs a specific check at M3 time — availability
+   changes).
+3. Wiring `VenueAdapter.placeOrder`/`getOrderStatus` for real, replacing the
+   `NotImplementedError` stubs — the interface shape doesn't change, only
+   the implementation.
+4. The kill switch's automatic triggers (FR-8.4 per-venue error rate,
+   FR-8.5 elevated unwind rate) become meaningful once there's live
+   execution and unwind history to compute rates from — M2's manual trigger
+   and unwind tracking are the prerequisite state for this.
+
+Per your original instructions: stop after M3 and report status before
+touching mainnet or real capital — nothing past devnet/testnet execution is
+in scope without your explicit go-ahead in a later session.
 
 ## What you'll need to supply for later milestones
 
-**M0/M1 (now):** nothing. Both adapters hit public, unauthenticated APIs.
-
-**M2 (second CEX + unwind stress-testing in paper mode):** nothing yet
-either, unless the second CEX's public endpoints need registration (most
-don't for market data).
+**M0/M1/M2 (now):** nothing. All three adapters hit public, unauthenticated APIs.
 
 **M3 (devnet/testnet execution):**
 - `SOLANA_DEVNET_RPC_URL` — a Solana devnet RPC endpoint
@@ -102,13 +124,13 @@ src/
   config/       asset universe (config, not code) + env-driven tuning
   adapters/
     dex/        RaydiumAdapter
-    cex/        MexcAdapter
+    cex/        MexcAdapter, BybitAdapter (M2)
   ingestion/    polls adapters, tracks per-venue freshness (FR-1.5)
-  engine/       opportunityDetector (FR-2), fillSimulator + paperTradingEngine (FR-9.1, M1)
+  engine/       opportunityDetector (FR-2), fillSimulator + paperTradingEngine (FR-9.1, M1), unwindSimulator + legFailureInjector (FR-5.4, M2)
   execution/    empty — M3+
   capital/      empty — M4+ (real capital allocation, FR-6)
-  monitoring/   structured JSON logger (FR-7), kill switch (FR-8), pnlTracker (FR-7.6, M1)
-  cli.ts        entrypoint, --mode flag
+  monitoring/   structured JSON logger (FR-7), kill switch (FR-8), pnlTracker (FR-7.6, M1), unwindTracker (FR-7.5, M2)
+  cli.ts        entrypoint, --mode and --stress-test flags
 ```
 
 Every adapter implements the same `VenueAdapter` interface
@@ -216,10 +238,32 @@ writing a new file in `adapters/`, not touching `engine/` or `ingestion/`.
    cache rather than one atomic read — a future refactor could pass the
    `Opportunity`'s underlying quotes through directly instead.
 
-## Non-negotiables carried forward (not yet exercised in M0/M1)
+10. **RAY has no third venue — Bybit doesn't list it.** Rather than force a
+    RAY pairing against a thin/stale pool just to have three-way coverage on
+    every asset (checked and rejected: a RAY-adjacent Raydium pool had ~$2k
+    TVL and a price ~2x off the real market), RAY stays a two-venue
+    (Raydium + MEXC) pair and Bybit only covers SOL. This is the SRS's own
+    "all coins is a filter problem" point (section 2.3) showing up as a real
+    constraint rather than something to paper over.
 
-These are honored in the type/interface design now so M2/M3 don't require
-rework, even though M0/M1 have no execution path to exercise them:
+11. **OKX was the first choice for CEX #2 and was dropped** — its public API
+    reset the TLS connection from this build environment (likely a
+    Cloudflare/geo block on this network, not a code issue). Bybit was
+    used instead; worth retrying OKX from wherever this actually deploys,
+    since it wasn't ruled out for any capability reason.
+
+12. **`--stress-test`'s leg-failure injection rate (~80% of trades get one
+    leg corrupted) is arbitrary, tuned for demo/verification density, not
+    calibrated to any real failure-rate data.** It exists to prove the
+    unwind path works reliably under many trials in one short run; it isn't
+    a model of how often real leg failures happen in production (FR-8.5's
+    unwind-rate threshold, whenever it's tuned in M3+, should be calibrated
+    from real execution data, not this number).
+
+## Non-negotiables carried forward (not yet exercised in M0/M1/M2)
+
+These are honored in the type/interface design now so M3 doesn't require
+rework, even though M0/M1/M2 have no real execution path to exercise them:
 
 - `VenueAdapter.placeOrder`/`getOrderStatus` exist in the interface and
   throw `NotImplementedError` in both adapters — the shape is fixed, the
