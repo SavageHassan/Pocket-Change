@@ -1,0 +1,4 @@
+{
+  "buildCommand": "echo 'static dashboard, nothing to build'",
+  "outputDirectory": "public"
+}
