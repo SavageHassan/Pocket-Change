@@ -72,6 +72,12 @@ export interface NormalizedQuote {
   bidDepth?: number; // quote-asset notional available at bestBid (CEX)
   askDepth?: number; // quote-asset notional available at bestAsk (CEX)
   liquidityUsd?: number; // DEX pool TVL, used as a coarse depth proxy
+  // Raw on-chain pool reserves, kept for diagnostics only — for a CLMM pool
+  // (all Raydium pools configured here) these are aggregated across the
+  // whole tick range and are NOT valid constant-product inputs at the
+  // current price. Slippage simulation derives virtual reserves from
+  // impliedPrice + liquidityUsd instead — see engine/fillSimulator.ts.
+  dexReserves?: { base: number; quote: number };
   feeSchedule: FeeSchedule;
   fetchedAt: number; // epoch ms — used for FR-1.5 freshness tracking
   raw?: unknown;
@@ -118,6 +124,38 @@ export interface VenueAdapter {
   placeOrder(assetId: string, side: LegSide, qty: number): Promise<Leg>;
 
   getOrderStatus(legId: string): Promise<Leg>;
+}
+
+// --- Paper trading types (M1, FR-9.1) ---
+
+export interface FillResult {
+  requestedQty: number;
+  filledQty: number;
+  avgPrice: number;
+  fullyFilled: boolean;
+}
+
+/**
+ * A simulated two-leg trade: an Opportunity that cleared the profit
+ * threshold, re-priced through realistic fill simulation (order-book walk
+ * for CEX, constant-product slippage for DEX) instead of assuming full
+ * fill at the quoted top-of-book/implied price. This is what turns a
+ * theoretically-profitable spread into a realistic (possibly unprofitable)
+ * one — the whole point of FR-9.1.
+ */
+export interface PaperTrade {
+  id: string;
+  timestamp: number;
+  assetId: string;
+  buyVenueId: string;
+  sellVenueId: string;
+  tradeSizeUsd: number;
+  theoreticalNetSpreadBps: number; // from the underlying Opportunity, pre-slippage
+  buyFill: FillResult;
+  sellFill: FillResult;
+  matchedQty: number; // min(buyFill.filledQty, sellFill.filledQty) — the unmatched remainder is a hypothetical FR-5.4 unwind case
+  feesUsd: number;
+  realizedPnlUsd: number;
 }
 
 export class NotImplementedError extends Error {

@@ -1,6 +1,6 @@
 import pino from "pino";
 import { mkdirSync } from "node:fs";
-import type { Opportunity } from "../types/index.js";
+import type { Opportunity, PaperTrade } from "../types/index.js";
 
 // FR-7: structured logging for every detected opportunity, every trade
 // attempt, and every fallback/failure event, from day one (M0) — not
@@ -27,6 +27,9 @@ export const logger = {
   },
   tradeAttempt(payload: Record<string, unknown>) {
     base.info({ event: "trade_attempt", ...payload }, "trade attempt");
+  },
+  paperTrade(trade: PaperTrade) {
+    base.info({ event: "paper_trade", ...trade }, "paper trade simulated");
   },
   failure(payload: Record<string, unknown>) {
     base.error({ event: "failure", ...payload }, "failure");

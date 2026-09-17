@@ -28,4 +28,8 @@ export const config = {
   // FR-2.5 / scenario 27: flag spreads implausibly large as likely stale/broken
   // data rather than real profit, pending independent confirmation.
   anomalyThresholdBps: num("ANOMALY_THRESHOLD_BPS", 500),
+
+  // M1 (FR-9.1): hypothetical trade size used to simulate fills against
+  // real order-book/pool depth. No real capital is ever at risk in --mode=paper.
+  paperTradeSizeUsd: num("PAPER_TRADE_SIZE_USD", 500),
 };

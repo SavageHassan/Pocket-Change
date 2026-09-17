@@ -12,6 +12,8 @@ interface RaydiumPoolResponse {
     price: number;
     tvl: number;
     feeRate: number;
+    mintAmountA: number; // base-asset reserve
+    mintAmountB: number; // quote-asset reserve
     mintA: { symbol: string; decimals: number };
     mintB: { symbol: string; decimals: number };
   }>;
@@ -59,6 +61,7 @@ export class RaydiumAdapter implements VenueAdapter {
         quoteAssetId: assetCfg.quoteAssetId,
         impliedPrice: pool.price,
         liquidityUsd: pool.tvl,
+        dexReserves: { base: pool.mintAmountA, quote: pool.mintAmountB },
         feeSchedule: { takerBps: pool.feeRate * 10000 },
         fetchedAt,
         raw: pool,
