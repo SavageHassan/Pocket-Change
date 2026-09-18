@@ -1,4 +1,8 @@
 {
-  "buildCommand": "echo 'static dashboard, nothing to build'",
-  "outputDirectory": "public"
+  "buildCommand": "echo 'static console + api functions, nothing to build'",
+  "outputDirectory": "public",
+  "functions": {
+    "api/quotes.js": { "maxDuration": 10 }
+  },
+  "regions": ["fra1"]
 }

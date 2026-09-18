@@ -4,1040 +4,534 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pocket Change</title>
-
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   :root {
-    --bg: #10131a;
-    --bg-2: #0c0e13;
-    --surface: #171b25;
-    --surface-2: #1e2430;
-    --border: #2a3142;
-    --border-soft: #232938;
-    --text: #e7e9ee;
-    --text-dim: #8b92a5;
-    --text-faint: #5b6274;
-    --accent: #d4a24e;
-    --accent-soft: rgba(212, 162, 78, 0.14);
-    --good: #4fb87a;
-    --good-soft: rgba(79, 184, 122, 0.14);
-    --bad: #e2685f;
-    --bad-soft: rgba(226, 104, 95, 0.14);
-    --warn: #e2b35f;
-    --warn-soft: rgba(226, 179, 95, 0.14);
-    --v-raydium: #9b87f5;
-    --v-mexc: #4fc3d9;
-    --v-bybit: #5b9df0;
-    --font-display: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
-    --font-body: "IBM Plex Sans", -apple-system, sans-serif;
-    --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-body);
-    margin: 0;
-    padding: 28px 20px 60px;
-    line-height: 1.5;
-  }
-
-  .wrap {
-    max-width: 1080px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  /* ---------- header ---------- */
-
-  .header {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .header-title {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .brand-mark { flex-shrink: 0; }
-
-  h1 {
-    font-family: var(--font-display);
-    font-size: 27px;
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: -0.01em;
-  }
-
-  .header-meta {
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    color: var(--text-dim);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    text-align: right;
-  }
-
-  .header-meta b { color: var(--text); font-weight: 500; }
-
-  .mode-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--warn-soft);
-    color: var(--warn);
-    border: 1px solid rgba(226, 179, 95, 0.35);
-    padding: 3px 9px;
-    border-radius: 5px;
-    font-size: 11px;
-    font-family: var(--font-mono);
-    letter-spacing: 0.03em;
-    align-self: flex-end;
-  }
-
-  .mode-pill::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--warn);
-  }
-
-  /* ---------- venue strip ---------- */
-
-  .venues {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .venue-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .venue-id {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-  }
-
-  .venue-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .venue-name {
-    font-weight: 600;
-    font-size: 14.5px;
-  }
-
-  .venue-type {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-    letter-spacing: 0.04em;
-  }
-
-  .venue-right {
-    text-align: right;
-  }
-
-  .venue-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--good);
-    letter-spacing: 0.03em;
-  }
-
-  .venue-status::before {
-    content: "";
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--good);
-    box-shadow: 0 0 0 2px var(--good-soft);
-  }
-
-  .venue-polls {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-    margin-top: 3px;
-  }
-
-  /* ---------- ticker tape ---------- */
-
-  .ticker-outer {
-    max-width: 1080px;
-    margin: 0 auto 28px;
-    background: var(--bg-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    padding: 9px 0;
-  }
-
-  .ticker-track {
-    display: inline-flex;
-    white-space: nowrap;
-    animation: ticker-scroll 34s linear infinite;
-  }
-
-  @keyframes ticker-scroll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .ticker-track { animation: none; }
-  }
-
-  .ticker-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 0 22px;
-    color: var(--text-dim);
-    border-right: 1px solid var(--border-soft);
-  }
-
-  .ticker-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .ticker-item .sym { color: var(--text); font-weight: 500; }
-  .ticker-item .px { font-variant-numeric: tabular-nums; color: var(--text); }
-  .ticker-item .venue-tag { color: var(--text-faint); font-size: 10.5px; }
-
-  /* ---------- header subtitle ---------- */
-
-  .subtitle {
-    font-size: 13px;
-    color: var(--text-dim);
-    max-width: 46ch;
-  }
-
-  /* ---------- hero metrics ---------- */
-
-  .hero-metrics {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-
-  .hero-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--border);
-    border-radius: 8px;
-    padding: 18px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .hero-tile.bad { border-left-color: var(--bad); }
-  .hero-tile.good { border-left-color: var(--good); }
-
-  .metric-label {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-
-  .hero-value {
-    font-family: var(--font-display);
-    font-size: 34px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-    line-height: 1.1;
-  }
-
-  .hero-value.bad { color: var(--bad); }
-  .hero-value.good { color: var(--good); }
-
-  .metric-sub {
-    font-size: 11.5px;
-    color: var(--text-dim);
-  }
-
-  /* ---------- stat strip (quiet, not a card) ---------- */
-
-  .stat-strip {
-    display: flex;
-    align-items: baseline;
-    gap: 20px;
-    padding: 2px 4px;
-  }
-
-  .stat-item {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-  }
-
-  .stat-value {
-    font-family: var(--font-display);
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stat-label {
-    font-size: 11.5px;
-    color: var(--text-faint);
-  }
-
-  .stat-divider {
-    width: 1px;
-    height: 12px;
-    background: var(--border);
-  }
-
-  /* ---------- sparkline ---------- */
-
-  .pnl-track {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 18px 12px;
-  }
-
-  .pnl-track-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
-  }
-
-  .pnl-track-title {
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .pnl-track-sub {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-faint);
-  }
-
-  /* ---------- two column section ---------- */
-
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: 12px;
-    align-items: start;
-  }
-
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 18px;
-  }
-
-  .panel-title {
-    font-size: 13px;
-    font-weight: 600;
-    margin: 0 0 4px;
-  }
-
-  .panel-sub {
-    font-size: 11.5px;
-    color: var(--text-dim);
-    margin: 0 0 14px;
-  }
-
-  /* route bars */
-
-  .route-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-top: 1px solid var(--border-soft);
-  }
-
-  .route-row:first-of-type { border-top: none; }
-
-  .route-label {
-    width: 150px;
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--text-dim);
-  }
-
-  .route-label .asset {
-    color: var(--text);
-    font-weight: 600;
-    margin-right: 2px;
-  }
-
-  .route-bars {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .route-bar-track {
-    position: relative;
-    height: 9px;
-    background: var(--surface-2);
-    border-radius: 3px;
-  }
-
-  .route-bar-fill {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .route-bar-fill.realized.bad { background: var(--bad); }
-  .route-bar-fill.realized.good { background: var(--good); }
-
-  .route-bar-marker {
-    position: absolute;
-    top: -3px;
-    bottom: -3px;
-    width: 2px;
-    background: var(--text-dim);
-    border-radius: 1px;
-  }
-
-  .route-value {
-    width: 64px;
-    text-align: right;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-  }
-
-  .route-value.bad { color: var(--bad); }
-  .route-value.good { color: var(--good); }
-
-  .legend {
-    display: flex;
-    gap: 16px;
-    margin-top: 12px;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-  }
-
-  .legend span { display: inline-flex; align-items: center; gap: 5px; }
-  .legend .sw { width: 8px; height: 8px; border-radius: 2px; }
-
-  /* unwind panel */
-
-  .unwind-stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 9px 0;
-    border-top: 1px solid var(--border-soft);
-    font-size: 12.5px;
-  }
-
-  .unwind-stat-row:first-of-type { border-top: none; }
-  .unwind-stat-row .k { color: var(--text-dim); }
-  .unwind-stat-row .v { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .unwind-stat-row .v.bad { color: var(--bad); }
-  .unwind-stat-row .v.good { color: var(--good); }
-  .unwind-stat-row .v.warn { color: var(--warn); }
-
-  .flatten-bar-track {
-    height: 8px;
-    background: var(--bad-soft);
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 12px 0 4px;
-  }
-
-  .flatten-bar-fill {
-    height: 100%;
-    background: var(--good);
-    border-radius: 4px 0 0 4px;
-  }
-
-  .flatten-caption {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-  }
-
-  .incomplete-note {
-    margin-top: 14px;
-    padding: 10px 12px;
-    background: var(--bad-soft);
-    border: 1px solid rgba(226, 104, 95, 0.3);
-    border-radius: 6px;
-    font-size: 11.5px;
-    color: var(--text-dim);
-  }
-
-  .incomplete-note b { color: var(--bad); font-weight: 600; }
-
-  /* ---------- trade feed ---------- */
-
-  .feed-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 4px;
-  }
-
-  .feed-filters {
-    display: flex;
-    gap: 6px;
-  }
-
-  .filter-btn {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.02em;
-    color: var(--text-dim);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 4px 10px;
-    cursor: pointer;
-  }
-
-  .filter-btn:hover { color: var(--text); }
-
-  .filter-btn.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-    border-color: rgba(212, 162, 78, 0.4);
-  }
-
-  .feed-table-wrap {
-    overflow-x: auto;
-    margin-top: 12px;
-  }
-
-  table.feed {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-
-  table.feed th {
-    text-align: left;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    font-weight: 500;
-    padding: 0 10px 8px;
-    white-space: nowrap;
-  }
-
-  table.feed th.num, table.feed td.num { text-align: right; }
-
-  table.feed td {
-    padding: 9px 10px;
-    border-top: 1px solid var(--border-soft);
-    white-space: nowrap;
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    vertical-align: top;
-  }
-
-  table.feed tr.detail-row td {
-    border-top: none;
-    padding-top: 0;
-    padding-bottom: 12px;
-    white-space: normal;
-  }
-
-  .t-time { color: var(--text-faint); font-size: 11px; }
-
-  .route-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-family: var(--font-body);
-    font-weight: 500;
-  }
-
-  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .arrow { color: var(--text-faint); font-size: 10px; }
-
-  .pnl-cell.bad { color: var(--bad); }
-  .pnl-cell.good { color: var(--good); }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.02em;
-  }
-
-  .status-pill.clean { background: var(--surface-2); color: var(--text-faint); }
-  .status-pill.flattened { background: var(--good-soft); color: var(--good); }
-  .status-pill.incomplete { background: var(--bad-soft); color: var(--bad); }
-
-  .unwind-detail {
-    font-family: var(--font-body);
-    font-size: 11.5px;
-    color: var(--text-dim);
-    padding: 2px 10px 0 10px;
-    border-left: 2px solid var(--border);
-    margin-left: 4px;
-  }
-
-  .unwind-detail b { color: var(--text); font-weight: 500; }
-  .unwind-detail.incomplete { border-left-color: var(--bad); }
-
-  /* ---------- footer ---------- */
-
-  .footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 12px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-faint);
-  }
-
-  .footer b { color: var(--text-dim); }
-
-  .milestones {
-    display: flex;
-    gap: 6px;
-  }
-
-  .ms-pill {
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: var(--good-soft);
-    color: var(--good);
-    font-size: 10px;
-  }
-
-  .ms-pill.pending { background: var(--surface-2); color: var(--text-faint); }
-
-  @media (max-width: 720px) {
-    .venues { grid-template-columns: 1fr; }
-    .hero-metrics { grid-template-columns: 1fr; }
-    .stat-strip { flex-wrap: wrap; gap: 12px 20px; }
-    .grid-2 { grid-template-columns: 1fr; }
-    .route-label { width: 120px; }
-    .header { flex-direction: column; }
-    .header-meta { text-align: left; }
+    --bg:#10131a; --bg-2:#0c0e13; --surface:#171b25; --surface-2:#1e2430;
+    --border:#2a3142; --border-soft:#232938;
+    --text:#e7e9ee; --text-dim:#8b92a5; --text-faint:#5b6274;
+    --accent:#d4a24e; --accent-soft:rgba(212,162,78,.14);
+    --good:#4fb87a; --good-soft:rgba(79,184,122,.14);
+    --bad:#e2685f; --bad-soft:rgba(226,104,95,.14);
+    --warn:#e2b35f; --warn-soft:rgba(226,179,95,.14);
+    --v-raydium:#9b87f5; --v-mexc:#4fc3d9; --v-bybit:#5b9df0;
+    --mono:"IBM Plex Mono","SF Mono",ui-monospace,monospace;
+    --sans:"IBM Plex Sans",-apple-system,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); margin:0; padding:28px 20px 60px; line-height:1.5; font-size:14px; }
+  .wrap { max-width:1080px; margin:0 auto; display:flex; flex-direction:column; gap:20px; }
+
+  .ticker-outer { max-width:1080px; margin:0 auto 24px; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; padding:9px 0; min-height:38px; }
+  .ticker-track { display:inline-flex; white-space:nowrap; animation:tick 40s linear infinite; }
+  @keyframes tick { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  @media (prefers-reduced-motion:reduce){ .ticker-track{animation:none} }
+  .ticker-item { display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:12px; padding:0 22px; color:var(--text-dim); border-right:1px solid var(--border-soft); }
+  .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .ticker-item .sym { color:var(--text); font-weight:500; } .ticker-item .px { color:var(--text); font-variant-numeric:tabular-nums; }
+
+  .header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:16px; padding-bottom:18px; border-bottom:1px solid var(--border); }
+  .brand { display:flex; align-items:center; gap:10px; }
+  h1 { font-family:var(--mono); font-size:27px; font-weight:700; margin:0; letter-spacing:-.01em; }
+  .subtitle { font-size:13px; color:var(--text-dim); max-width:48ch; margin-top:6px; display:block; }
+  .header-meta { font-family:var(--mono); font-size:12px; color:var(--text-dim); display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:5px; font-family:var(--mono); font-size:11px; letter-spacing:.03em; }
+  .pill::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .pill.live { background:var(--good-soft); color:var(--good); border:1px solid rgba(79,184,122,.35); }
+  .pill.warn { background:var(--warn-soft); color:var(--warn); border:1px solid rgba(226,179,95,.35); }
+  .pill.bad { background:var(--bad-soft); color:var(--bad); border:1px solid rgba(226,104,95,.35); }
+
+  .banner { display:none; padding:10px 14px; border-radius:8px; font-size:13px; }
+  .banner.show { display:block; }
+  .banner.kill { background:var(--bad-soft); border:1px solid rgba(226,104,95,.4); color:var(--bad); }
+  .banner b { font-weight:600; }
+
+  .venues { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .venue-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:13px 15px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .venue-name { font-weight:600; font-size:14.5px; display:flex; align-items:center; gap:8px; }
+  .venue-type { font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin-left:15px; }
+  .venue-right { text-align:right; font-family:var(--mono); font-size:10.5px; color:var(--text-faint); }
+  .st { display:inline-block; padding:1px 7px; border-radius:4px; margin-bottom:3px; }
+  .st.ok { color:var(--good); background:var(--good-soft); } .st.err { color:var(--bad); background:var(--bad-soft); } .st.stale { color:var(--warn); background:var(--warn-soft); }
+
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 18px; }
+  .panel-title { font-size:13px; font-weight:600; margin:0 0 4px; }
+  .panel-sub { font-size:11.5px; color:var(--text-dim); margin:0 0 12px; }
+  .label { font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+
+  .controls { display:flex; flex-wrap:wrap; gap:18px 28px; align-items:flex-end; }
+  .ctl { display:flex; flex-direction:column; gap:6px; }
+  .ctl output { font-family:var(--mono); font-size:13px; color:var(--text); }
+  input[type=range] { width:220px; accent-color:var(--accent); }
+  select { background:var(--surface-2); color:var(--text); border:1px solid var(--border); border-radius:5px; padding:6px 8px; font-family:var(--mono); font-size:12px; }
+
+  .scen { display:flex; flex-wrap:wrap; gap:8px; }
+  button { font-family:var(--mono); font-size:11.5px; color:var(--text); background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:8px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button.active { background:var(--accent-soft); border-color:rgba(212,162,78,.5); color:var(--accent); }
+  button.danger.active { background:var(--bad-soft); border-color:rgba(226,104,95,.5); color:var(--bad); }
+  .scen-note { font-size:11.5px; color:var(--text-dim); margin-top:10px; min-height:18px; }
+
+  .hero { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .tile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+  .tile .v { font-family:var(--mono); font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:4px; }
+  .tile .s { font-size:11.5px; color:var(--text-dim); }
+  .good { color:var(--good); } .bad { color:var(--bad); } .warnc { color:var(--warn); }
+
+  .tbl-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; font-family:var(--mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint); font-weight:500; padding:0 10px 8px; white-space:nowrap; }
+  td { padding:8px 10px; border-top:1px solid var(--border-soft); white-space:nowrap; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  th.n, td.n { text-align:right; }
+  .route { font-family:var(--sans); font-weight:500; display:inline-flex; align-items:center; gap:5px; }
+  .arrow { color:var(--text-faint); font-size:10px; }
+  .bar { position:relative; width:90px; height:7px; background:var(--surface-2); border-radius:3px; display:inline-block; vertical-align:middle; margin-left:8px; }
+  .bar i { position:absolute; top:0; bottom:0; border-radius:3px; }
+  .bar .zero { position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--text-faint); left:50%; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; }
+  .tag.trade { background:var(--good-soft); color:var(--good); } .tag.below { background:var(--surface-2); color:var(--text-faint); }
+  .tag.stale { background:var(--warn-soft); color:var(--warn); } .tag.kill { background:var(--bad-soft); color:var(--bad); }
+  tr.detail td { border-top:none; padding-top:0; white-space:normal; font-family:var(--sans); font-size:11.5px; color:var(--text-dim); }
+  tr.detail .ud { border-left:2px solid var(--border); padding-left:10px; margin-left:4px; }
+  tr.detail .ud.inc { border-left-color:var(--bad); }
+  tr.clickable { cursor:pointer; }
+
+  .grid-2 { display:grid; grid-template-columns:1.4fr 1fr; gap:12px; align-items:start; }
+  .log { font-family:var(--mono); font-size:11px; height:250px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; }
+  .log div { color:var(--text-dim); white-space:pre-wrap; word-break:break-word; }
+  .log .t { color:var(--text-faint); } .log .k-trade { color:var(--good); } .log .k-unwind { color:var(--warn); }
+  .log .k-fail { color:var(--bad); } .log .k-scen { color:var(--accent); } .log .k-sys { color:var(--text-dim); }
+  .empty { color:var(--text-faint); font-size:12px; padding:14px 0; }
+  .footer { font-family:var(--mono); font-size:11px; color:var(--text-faint); padding-top:14px; border-top:1px solid var(--border); }
+
+  @media (max-width:760px){
+    .venues{grid-template-columns:1fr} .hero{grid-template-columns:repeat(2,1fr)} .grid-2{grid-template-columns:1fr}
+    .header-meta{align-items:flex-start} input[type=range]{width:100%}
   }
 </style>
+</head>
+<body>
 
-<div class="ticker-outer">
-  <div class="ticker-track" id="ticker-track"></div>
-</div>
+<div class="ticker-outer"><div class="ticker-track" id="ticker"><span class="ticker-item">connecting to venues…</span></div></div>
 
 <div class="wrap">
 
   <div class="header">
-    <div class="header-title">
+    <div>
       <div class="brand">
-        <svg class="brand-mark" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="14.5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" />
-          <text x="16" y="21.5" text-anchor="middle" font-family="var(--font-display)" font-size="15" font-weight="700" fill="var(--accent)">&#162;</text>
-        </svg>
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/><text x="16" y="21.5" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="700" fill="var(--accent)">&#162;</text></svg>
         <h1>Pocket Change</h1>
       </div>
-      <span class="subtitle">Tracks spreads across exchanges and paper-trades every one, down to the cent</span>
+      <span class="subtitle">Live spreads across exchanges, paper-traded on real prices. Break things on purpose to watch the safety nets work.</span>
     </div>
     <div class="header-meta">
-      <span class="mode-pill">paper &middot; stress-test</span>
-      <span><b>3 venues</b> &middot; SOL/USDT, RAY/USDT</span>
-      <span>run window <b id="run-window">—</b></span>
+      <span class="pill live" id="modePill">live prices &middot; paper trading</span>
+      <span id="pollInfo">polling…</span>
+      <span>no orders are ever placed</span>
     </div>
   </div>
 
+  <div class="banner kill" id="killBanner"><b>Kill switch tripped.</b> Detection keeps running, but no paper trades will execute until you reset it.</div>
+
   <div class="venues" id="venues"></div>
 
-  <div class="hero-metrics" id="hero-metrics"></div>
-  <div class="stat-strip" id="stat-strip"></div>
-
-  <div class="pnl-track">
-    <div class="pnl-track-head">
-      <span class="pnl-track-title">Cumulative realized P&amp;L, in trade order</span>
-      <span class="pnl-track-sub" id="pnl-track-sub"></span>
+  <div class="panel">
+    <p class="panel-title">Settings</p>
+    <div class="controls">
+      <div class="ctl">
+        <span class="label">Min net spread to trade</span>
+        <input type="range" id="thr" min="-60" max="30" step="1" value="5" aria-label="Minimum net spread in basis points">
+        <output id="thrOut">5 bps</output>
+      </div>
+      <div class="ctl">
+        <span class="label">Paper trade size</span>
+        <select id="size" aria-label="Paper trade size">
+          <option value="100">$100</option><option value="500" selected>$500</option>
+          <option value="5000">$5,000</option><option value="50000">$50,000 (walks the book)</option>
+        </select>
+      </div>
+      <div class="ctl">
+        <span class="label">Feed considered stale after</span>
+        <output>8 s</output>
+      </div>
     </div>
-    <svg id="pnl-svg" viewBox="0 0 1000 140" preserveAspectRatio="none" style="width:100%; height:120px; display:block;"></svg>
+    <p class="scen-note" style="margin-top:12px">Real spreads are usually smaller than fees, so at the default 5 bps the bot correctly sits still. Drag the threshold down to see it trade on thin edges, or use the scenarios below to force the interesting cases.</p>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Test scenarios</p>
+    <p class="panel-sub">Each one injects a specific condition into the live feed so you can watch how the bot reacts.</p>
+    <div class="scen">
+      <button id="bSpread">Force a profitable spread (20s)</button>
+      <button id="bFail">Fail one leg on next trade</button>
+      <button id="bThin">Thin the order books (20s)</button>
+      <button id="bStale">Freeze Bybit feed (20s)</button>
+      <button id="bKill" class="danger">Kill switch</button>
+      <button id="bReset">Reset everything</button>
+    </div>
+    <div class="scen-note" id="scenNote">Pick a scenario. The log below narrates what the bot does about it.</div>
+  </div>
+
+  <div class="hero">
+    <div class="tile"><div class="label">Realized P&amp;L</div><div class="v" id="tPnl">$0.0000</div><div class="s" id="tPnlSub">no trades yet</div></div>
+    <div class="tile"><div class="label">Paper trades</div><div class="v" id="tTrades">0</div><div class="s" id="tTradesSub">waiting for an edge</div></div>
+    <div class="tile"><div class="label">Unwinds</div><div class="v" id="tUnw">0</div><div class="s" id="tUnwSub">no leg mismatches</div></div>
+    <div class="tile"><div class="label">Best net spread now</div><div class="v" id="tBest">&mdash;</div><div class="s" id="tBestSub">&nbsp;</div></div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Live spread scanner</p>
+    <p class="panel-sub">Every route, every poll: buy at the venue's ask (or pool price), sell at the other's bid, minus both fees. Green means it clears your threshold.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Route</th><th class="n">Buy px</th><th class="n">Sell px</th><th class="n">Gross</th><th class="n">Fees</th><th class="n">Net</th><th>Status</th></tr></thead>
+      <tbody id="scan"><tr><td colspan="7" class="empty">Waiting for the first price poll…</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Best net spread, last 90 seconds</p>
+    <p class="panel-sub">The dashed line is your threshold. Crossing it is what triggers a paper trade.</p>
+    <svg id="spark" viewBox="0 0 1000 130" preserveAspectRatio="none" style="width:100%;height:120px;display:block"></svg>
   </div>
 
   <div class="grid-2">
     <div class="panel">
-      <p class="panel-title">P&amp;L by route</p>
-      <p class="panel-sub">Bar is what the fill simulation + unwind cost actually realized; the tick marks where the naive theoretical spread would have landed</p>
-      <div id="routes"></div>
-      <div class="legend">
-        <span><i class="sw" style="background:var(--bad);border-radius:2px"></i> realized (loss)</span>
-        <span><i class="sw" style="background:var(--text-dim);width:2px;border-radius:1px"></i> theoretical marker</span>
-      </div>
+      <p class="panel-title">Paper trades</p>
+      <p class="panel-sub">Click a row that mismatched to see the unwind action.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Time</th><th>Route</th><th class="n">Matched</th><th class="n">Realized</th><th>Status</th></tr></thead>
+        <tbody id="trades"><tr><td colspan="5" class="empty">No trades yet. Lower the threshold or force a spread.</td></tr></tbody>
+      </table></div>
     </div>
-
     <div class="panel">
-      <p class="panel-title">Unwind ledger &mdash; FR-5.4</p>
-      <p class="panel-sub">Every leg mismatch this run, and whether the offsetting order fully flattened the exposure</p>
-      <div id="unwind-stats"></div>
-      <div class="flatten-bar-track"><div class="flatten-bar-fill" id="flatten-fill"></div></div>
-      <div class="flatten-caption" id="flatten-caption"></div>
-      <div class="incomplete-note" id="incomplete-note"></div>
+      <p class="panel-title">Event log</p>
+      <p class="panel-sub">Same events the real bot writes to its structured log.</p>
+      <div class="log" id="log"></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="feed-head">
-      <p class="panel-title" style="margin:0;">Trade feed</p>
-      <div class="feed-filters" id="filters">
-        <button class="filter-btn active" data-filter="all">all</button>
-        <button class="filter-btn" data-filter="mismatched">mismatched</button>
-        <button class="filter-btn" data-filter="clean">clean</button>
-      </div>
-    </div>
-    <p class="panel-sub" style="margin-top:6px;">Every simulated trade this run, in order. Click a mismatched row for the unwind action taken.</p>
-    <div class="feed-table-wrap">
-      <table class="feed">
-        <thead>
-          <tr>
-            <th>time</th>
-            <th>route</th>
-            <th class="num">matched</th>
-            <th class="num">realized</th>
-            <th>status</th>
-          </tr>
-        </thead>
-        <tbody id="feed-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="footer">
-    <span><b>Milestones:</b>
-      <span class="milestones">
-        <span class="ms-pill">M0 detect</span>
-        <span class="ms-pill">M1 paper</span>
-        <span class="ms-pill">M2 unwind</span>
-        <span class="ms-pill pending">M3 testnet</span>
-      </span>
-    </span>
-    <span>captured from a real local <code>--mode=paper --stress-test</code> run &middot; reproduce with <code>npm start -- --mode=paper --stress-test</code></span>
-  </div>
-
+  <div class="footer">Prices are real (Raydium, MEXC, Bybit public APIs via a serverless proxy). Trading logic is the bot's own, ported to run here. The always-on bot itself runs locally: <code>npm start -- --mode=paper</code>.</div>
 </div>
 
 <script>
 (function () {
-  var DATA = {"venues": {"raydium": {"name": "Raydium", "type": "DEX", "chain": "Solana"}, "mexc": {"name": "MEXC", "type": "CEX", "chain": null}, "bybit": {"name": "Bybit", "type": "CEX", "chain": null}}, "pollCounts": {"raydium": 4, "bybit": 8, "mexc": 8}, "pairStats": {"SOL:raydium->mexc": {"trades": 4, "theoretical": -2.0377, "realized": -3.5186}, "SOL:raydium->bybit": {"trades": 4, "theoretical": -2.8406, "realized": -2.7928}, "SOL:mexc->raydium": {"trades": 4, "theoretical": -2.563, "realized": -3.8823}, "SOL:mexc->bybit": {"trades": 4, "theoretical": -5.0035, "realized": -3.1133}, "SOL:bybit->raydium": {"trades": 4, "theoretical": -1.76, "realized": -2.6118}, "SOL:bybit->mexc": {"trades": 4, "theoretical": -3.3976, "realized": -3.108}, "RAY:raydium->mexc": {"trades": 4, "theoretical": -1.7894, "realized": -8.8946}}, "totals": {"trades": 28, "realized": -27.9213, "theoretical": -19.3919, "unwindEvents": 22, "unwindFullyFlattened": 21, "unwindTotalLoss": 8.2568, "opportunitiesScanned": 28}, "ticker": [{"venue": "mexc", "asset": "RAY", "price": 1.4509}, {"venue": "raydium", "asset": "RAY", "price": 1.453}, {"venue": "bybit", "asset": "SOL", "price": 99.6}, {"venue": "mexc", "asset": "SOL", "price": 99.6256}, {"venue": "raydium", "asset": "SOL", "price": 99.5081}], "trades": [{"id": "pt_1789640365417_1", "time": "2026-09-17T10:19:25.417Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -10.2, "matchedQty": 2.7158, "realizedPnl": -0.5972, "buyFilled": 2.7158, "buyRequested": 5.0185, "sellFilled": 5.0185, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6303, "mismatched": true, "unwindAction": "bought back 2.302637 SOL on mexc to flatten naked short exposure", "unwindLoss": -0.2439, "fullyFlattened": true}, {"id": "pt_1789640365417_2", "time": "2026-09-17T10:19:25.417Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "bybit", "theoreticalBps": -13.2, "matchedQty": 0, "realizedPnl": -0.5501, "buyFilled": 0, "buyRequested": 5.0185, "sellFilled": 5.0185, "sellRequested": 5.0185, "buyPrice": null, "sellPrice": 99.61, "mismatched": true, "unwindAction": "bought back 5.018472 SOL on bybit to flatten naked short exposure", "unwindLoss": 0.0502, "fullyFlattened": true}, {"id": "pt_1789640365417_3", "time": "2026-09-17T10:19:25.417Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "raydium", "theoreticalBps": -12.8, "matchedQty": 5.0176, "realizedPnl": -1.2115, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 5.0176, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.5082, "mismatched": false}, {"id": "pt_1789640365417_4", "time": "2026-09-17T10:19:25.417Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "bybit", "theoreticalBps": -24.0, "matchedQty": 3.5007, "realizedPnl": -0.9567, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 3.5007, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.61, "mismatched": true, "unwindAction": "sold 1.516837 SOL on mexc to flatten naked long exposure", "unwindLoss": -0.032, "fullyFlattened": true}, {"id": "pt_1789640365418_5", "time": "2026-09-17T10:19:25.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "raydium", "theoreticalBps": -9.8, "matchedQty": 0, "realizedPnl": -0.5502, "buyFilled": 5.0191, "buyRequested": 5.0191, "sellFilled": 0, "sellRequested": 5.0191, "buyPrice": 99.62, "sellPrice": null, "mismatched": true, "unwindAction": "sold 5.019072 SOL on bybit to flatten naked long exposure", "unwindLoss": 0.0502, "fullyFlattened": true}, {"id": "pt_1789640365418_6", "time": "2026-09-17T10:19:25.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "mexc", "theoreticalBps": -18.0, "matchedQty": 2.7855, "realizedPnl": -0.7942, "buyFilled": 5.0191, "buyRequested": 5.0191, "sellFilled": 2.7855, "sellRequested": 5.0191, "buyPrice": 99.62, "sellPrice": 99.6303, "mismatched": true, "unwindAction": "sold 2.233528 SOL on bybit to flatten naked long exposure", "unwindLoss": 0.0454, "fullyFlattened": true}, {"id": "pt_1789640365418_7", "time": "2026-09-17T10:19:25.418Z", "asset": "RAY", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -0.3, "matchedQty": 0, "realizedPnl": -1.3697, "buyFilled": 0, "buyRequested": 345.2141, "sellFilled": 345.2141, "sellRequested": 345.2141, "buyPrice": null, "sellPrice": 1.4533, "mismatched": true, "unwindAction": "bought back 345.214097 RAY on mexc to flatten naked short exposure \u2014 INCOMPLETE, only flattened 278.470000 of 345.214097", "unwindLoss": 0.868, "fullyFlattened": false}, {"id": "pt_1789640368417_8", "time": "2026-09-17T10:19:28.417Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -10.2, "matchedQty": 0.5185, "realizedPnl": -0.6136, "buyFilled": 5.0185, "buyRequested": 5.0185, "sellFilled": 0.5185, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6303, "mismatched": true, "unwindAction": "sold 4.500015 SOL on raydium to flatten naked long exposure", "unwindLoss": 0.4969, "fullyFlattened": true}, {"id": "pt_1789640368417_9", "time": "2026-09-17T10:19:28.417Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "bybit", "theoreticalBps": -14.2, "matchedQty": 2.2239, "realizedPnl": -0.6841, "buyFilled": 5.0185, "buyRequested": 5.0185, "sellFilled": 2.2239, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6, "mismatched": true, "unwindAction": "sold 2.794565 SOL on raydium to flatten naked long exposure", "unwindLoss": 0.1158, "fullyFlattened": true}, {"id": "pt_1789640368417_10", "time": "2026-09-17T10:19:28.417Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "raydium", "theoreticalBps": -12.8, "matchedQty": 3.2244, "realizedPnl": -0.837, "buyFilled": 3.2244, "buyRequested": 5.0176, "sellFilled": 5.0176, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.5082, "mismatched": true, "unwindAction": "bought back 1.793124 SOL on raydium to flatten naked short exposure", "unwindLoss": 0.0585, "fullyFlattened": true}, {"id": "pt_1789640368418_11", "time": "2026-09-17T10:19:28.418Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "bybit", "theoreticalBps": -25.0, "matchedQty": 2.3611, "realizedPnl": -0.7719, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 2.3611, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.6, "mismatched": true, "unwindAction": "sold 2.656481 SOL on mexc to flatten naked long exposure", "unwindLoss": -0.0813, "fullyFlattened": true}, {"id": "pt_1789640368418_12", "time": "2026-09-17T10:19:28.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "raydium", "theoreticalBps": -8.8, "matchedQty": 0, "realizedPnl": -0.5502, "buyFilled": 5.0196, "buyRequested": 5.0196, "sellFilled": 0, "sellRequested": 5.0196, "buyPrice": 99.61, "sellPrice": null, "mismatched": true, "unwindAction": "sold 5.019576 SOL on bybit to flatten naked long exposure", "unwindLoss": 0.0502, "fullyFlattened": true}, {"id": "pt_1789640368418_13", "time": "2026-09-17T10:19:28.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "mexc", "theoreticalBps": -17.0, "matchedQty": 0, "realizedPnl": -0.5988, "buyFilled": 0, "buyRequested": 5.0196, "sellFilled": 5.0196, "sellRequested": 5.0196, "buyPrice": null, "sellPrice": 99.6303, "mismatched": true, "unwindAction": "bought back 5.019576 SOL on mexc to flatten naked short exposure", "unwindLoss": 0.0987, "fullyFlattened": true}, {"id": "pt_1789640368418_14", "time": "2026-09-17T10:19:28.418Z", "asset": "RAY", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -8.6, "matchedQty": 0, "realizedPnl": -3.2098, "buyFilled": 345.2141, "buyRequested": 345.2141, "sellFilled": 0, "sellRequested": 345.2141, "buyPrice": 1.453, "sellPrice": null, "mismatched": true, "unwindAction": "sold 345.214097 RAY on raydium to flatten naked long exposure", "unwindLoss": 3.2098, "fullyFlattened": true}, {"id": "pt_1789640371418_15", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -10.2, "matchedQty": 5.0185, "realizedPnl": -1.1539, "buyFilled": 5.0185, "buyRequested": 5.0185, "sellFilled": 5.0185, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6256, "mismatched": false}, {"id": "pt_1789640371418_16", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "bybit", "theoreticalBps": -14.2, "matchedQty": 3.2374, "realizedPnl": -0.7448, "buyFilled": 3.2374, "buyRequested": 5.0185, "sellFilled": 5.0185, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6, "mismatched": true, "unwindAction": "bought back 1.781047 SOL on bybit to flatten naked short exposure", "unwindLoss": -0.2599, "fullyFlattened": true}, {"id": "pt_1789640371418_17", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "raydium", "theoreticalBps": -12.8, "matchedQty": 5.0176, "realizedPnl": -1.2115, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 5.0176, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.5082, "mismatched": false}, {"id": "pt_1789640371418_18", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "bybit", "theoreticalBps": -25.0, "matchedQty": 3.4965, "realizedPnl": -0.976, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 3.4965, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.6, "mismatched": true, "unwindAction": "sold 1.521049 SOL on mexc to flatten naked long exposure", "unwindLoss": -0.0471, "fullyFlattened": true}, {"id": "pt_1789640371418_19", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "raydium", "theoreticalBps": -8.8, "matchedQty": 0, "realizedPnl": -0.5502, "buyFilled": 5.0196, "buyRequested": 5.0196, "sellFilled": 0, "sellRequested": 5.0196, "buyPrice": 99.61, "sellPrice": null, "mismatched": true, "unwindAction": "sold 5.019576 SOL on bybit to flatten naked long exposure", "unwindLoss": 0.0502, "fullyFlattened": true}, {"id": "pt_1789640371418_20", "time": "2026-09-17T10:19:31.418Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "mexc", "theoreticalBps": -17.0, "matchedQty": 5.0196, "realizedPnl": -0.9216, "buyFilled": 5.0196, "buyRequested": 5.0196, "sellFilled": 5.0196, "sellRequested": 5.0196, "buyPrice": 99.61, "sellPrice": 99.6256, "mismatched": false}, {"id": "pt_1789640371419_21", "time": "2026-09-17T10:19:31.419Z", "asset": "RAY", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -13.4, "matchedQty": 0, "realizedPnl": -3.2098, "buyFilled": 345.2141, "buyRequested": 345.2141, "sellFilled": 0, "sellRequested": 345.2141, "buyPrice": 1.453, "sellPrice": null, "mismatched": true, "unwindAction": "sold 345.214097 RAY on raydium to flatten naked long exposure", "unwindLoss": 3.2098, "fullyFlattened": true}, {"id": "pt_1789640374418_22", "time": "2026-09-17T10:19:34.418Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -10.2, "matchedQty": 5.0185, "realizedPnl": -1.1539, "buyFilled": 5.0185, "buyRequested": 5.0185, "sellFilled": 5.0185, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.6256, "mismatched": false}, {"id": "pt_1789640374418_23", "time": "2026-09-17T10:19:34.419Z", "asset": "SOL", "buyVenue": "raydium", "sellVenue": "bybit", "theoreticalBps": -15.2, "matchedQty": 2.9478, "realizedPnl": -0.8138, "buyFilled": 5.0185, "buyRequested": 5.0185, "sellFilled": 2.9478, "sellRequested": 5.0185, "buyPrice": 99.7559, "sellPrice": 99.59, "mismatched": true, "unwindAction": "sold 2.070646 SOL on raydium to flatten naked long exposure", "unwindLoss": 0.0311, "fullyFlattened": true}, {"id": "pt_1789640374419_24", "time": "2026-09-17T10:19:34.419Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "raydium", "theoreticalBps": -12.8, "matchedQty": 0, "realizedPnl": -0.6222, "buyFilled": 5.0176, "buyRequested": 5.0176, "sellFilled": 0, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": null, "mismatched": true, "unwindAction": "sold 5.017561 SOL on mexc to flatten naked long exposure", "unwindLoss": 0.1222, "fullyFlattened": true}, {"id": "pt_1789640374419_25", "time": "2026-09-17T10:19:34.419Z", "asset": "SOL", "buyVenue": "mexc", "sellVenue": "bybit", "theoreticalBps": -26.0, "matchedQty": 0.7625, "realizedPnl": -0.4087, "buyFilled": 0.7625, "buyRequested": 5.0176, "sellFilled": 5.0176, "sellRequested": 5.0176, "buyPrice": 99.65, "sellPrice": 99.59, "mismatched": true, "unwindAction": "bought back 4.255022 SOL on bybit to flatten naked short exposure", "unwindLoss": -0.2128, "fullyFlattened": true}, {"id": "pt_1789640374419_26", "time": "2026-09-17T10:19:34.419Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "raydium", "theoreticalBps": -7.8, "matchedQty": 5.0201, "realizedPnl": -0.9612, "buyFilled": 5.0201, "buyRequested": 5.0201, "sellFilled": 5.0201, "sellRequested": 5.0201, "buyPrice": 99.6, "sellPrice": 99.5081, "mismatched": false}, {"id": "pt_1789640374419_27", "time": "2026-09-17T10:19:34.419Z", "asset": "SOL", "buyVenue": "bybit", "sellVenue": "mexc", "theoreticalBps": -16.0, "matchedQty": 2.9873, "realizedPnl": -0.7935, "buyFilled": 5.0201, "buyRequested": 5.0201, "sellFilled": 2.9873, "sellRequested": 5.0201, "buyPrice": 99.6, "sellPrice": 99.6256, "mismatched": true, "unwindAction": "sold 2.032807 SOL on bybit to flatten naked long exposure", "unwindLoss": 0.0724, "fullyFlattened": true}, {"id": "pt_1789640374419_28", "time": "2026-09-17T10:19:34.419Z", "asset": "RAY", "buyVenue": "raydium", "sellVenue": "mexc", "theoreticalBps": -13.4, "matchedQty": 0, "realizedPnl": -1.1051, "buyFilled": 0, "buyRequested": 345.2141, "sellFilled": 345.2141, "sellRequested": 345.2141, "buyPrice": null, "sellPrice": 1.4509, "mismatched": true, "unwindAction": "bought back 345.214097 RAY on mexc to flatten naked short exposure", "unwindLoss": 0.6043, "fullyFlattened": true}]};
+  "use strict";
+  var POLL_MS = 3000, MAX_AGE_MS = 8000, COOLDOWN_MS = 6000;
+  var VC = { raydium: "var(--v-raydium)", mexc: "var(--v-mexc)", bybit: "var(--v-bybit)" };
+  var VN = { raydium: "Raydium", mexc: "MEXC", bybit: "Bybit" };
+  var VT = { raydium: "DEX · Solana", mexc: "CEX", bybit: "CEX" };
+  var VENUES = ["raydium", "mexc", "bybit"];
+  var ASSETS = ["SOL", "RAY"];
 
-  var VENUE_COLOR = { raydium: 'var(--v-raydium)', mexc: 'var(--v-mexc)', bybit: 'var(--v-bybit)' };
+  var S = {
+    raw: {}, status: {}, polls: 0, lastLatency: 0,
+    scen: { spreadUntil: 0, thinUntil: 0, freezeUntil: 0, failNext: false },
+    kill: false, trades: [], unwinds: 0, unwindLoss: 0, incomplete: 0,
+    cum: [0], pnl: 0, best: [], cooldown: {}, rows: []
+  };
 
-  function fmtUsd(n, signed) {
-    var sign = n > 0 ? '+' : (n < 0 ? '−' : '');
-    var v = Math.abs(n).toFixed(4);
-    return (signed ? sign : (n < 0 ? '−' : '')) + '$' + v;
+  function $(id) { return document.getElementById(id); }
+  function now() { return Date.now(); }
+  function fmt(n, d) { return Number(n).toFixed(d == null ? 4 : d); }
+  function usd(n) { return (n < 0 ? "−" : n > 0 ? "+" : "") + "$" + Math.abs(n).toFixed(4); }
+  function bps(n) { return (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(1); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+
+  function log(kind, msg) {
+    var el = $("log"), d = document.createElement("div");
+    d.innerHTML = '<span class="t">' + new Date().toISOString().substr(11, 8) + '</span> <span class="k-' + kind + '">' + esc(msg) + "</span>";
+    el.appendChild(d);
+    while (el.children.length > 120) el.removeChild(el.firstChild);
+    el.scrollTop = el.scrollHeight;
   }
 
-  function fmtTime(iso) {
-    var d = new Date(iso);
-    return d.toISOString().substr(11, 8) + 'Z';
+  // ---------- quotes (with scenario transforms applied at read time) ----------
+  function getQuote(v, a) {
+    var q = S.raw[v + "|" + a];
+    if (!q) return null;
+    var t = now(), out = { venue: v, asset: a, feeBps: q.feeBps, fetchedAt: q.fetchedAt, tvl: q.tvl };
+    var factor = 1;
+    if (t < S.scen.spreadUntil && v === "raydium" && a === "SOL") factor = 0.9935; // pool priced 65 bps cheap
+    var depth = (t < S.scen.thinUntil && v !== "raydium") ? 0.04 : 1;
+    if (q.price != null) out.price = q.price * factor;
+    if (q.bids) {
+      out.bids = q.bids.map(function (l) { return [l[0] * factor, l[1] * depth]; });
+      out.asks = q.asks.map(function (l) { return [l[0] * factor, l[1] * depth]; });
+    }
+    out.age = t - q.fetchedAt;
+    out.fresh = out.age <= MAX_AGE_MS;
+    return out;
+  }
+  function buyPx(q) { return q.asks ? q.asks[0][0] : q.price; }
+  function sellPx(q) { return q.bids ? q.bids[0][0] : q.price; }
+  function isDex(q) { return q.price != null && !q.bids; }
+
+  // ---------- fill simulation (port of engine/fillSimulator.ts) ----------
+  function cexFill(q, side, qty) {
+    var levels = side === "buy" ? q.asks : q.bids, rem = qty, spent = 0;
+    for (var i = 0; i < levels.length && rem > 0; i++) {
+      var take = Math.min(rem, levels[i][1]); spent += take * levels[i][0]; rem -= take;
+    }
+    var filled = qty - rem;
+    return { req: qty, filled: filled, avg: filled > 0 ? spent / filled : 0 };
+  }
+  function dexFill(q, side, qty) {
+    var fee = q.feeBps / 10000, qr = q.tvl / 2, br = qr / q.price, k = br * qr;
+    if (side === "buy") {
+      if (qty >= br) return { req: qty, filled: 0, avg: 0 };
+      var nb = br - qty, nq = k / nb;
+      return { req: qty, filled: qty, avg: ((nq - qr) / (1 - fee)) / qty };
+    }
+    var nb2 = br + qty, nq2 = k / nb2;
+    return { req: qty, filled: qty, avg: ((qr - nq2) * (1 - fee)) / qty };
+  }
+  function fill(q, side, qty) { return isDex(q) ? dexFill(q, side, qty) : cexFill(q, side, qty); }
+  function explicitFee(q, f) { return isDex(q) || f.filled <= 0 ? 0 : f.filled * f.avg * q.feeBps / 10000; }
+
+  // ---------- unwind (port of engine/unwindSimulator.ts) ----------
+  function unwind(asset, bq, sq, bf, sf) {
+    var net = bf.filled - sf.filled;
+    if (Math.abs(net) < 1e-9) return null;
+    var uf, action, loss, qty = Math.abs(net);
+    if (net > 0) {
+      uf = fill(bq, "sell", qty);
+      action = "sold " + fmt(qty, 6) + " " + asset + " on " + VN[bq.venue] + " to flatten naked long";
+      loss = qty * ((sf.avg || bf.avg) - uf.avg);
+    } else {
+      uf = fill(sq, "buy", qty);
+      action = "bought back " + fmt(qty, 6) + " " + asset + " on " + VN[sq.venue] + " to flatten naked short";
+      loss = qty * (uf.avg - (bf.avg || sf.avg));
+    }
+    var full = uf.filled >= qty - 1e-9;
+    if (!full) action += " (INCOMPLETE: only " + fmt(uf.filled, 6) + " of " + fmt(qty, 6) + ")";
+    return { action: action, loss: loss, full: full };
   }
 
-  // ---- header run window ----
-  var times = DATA.trades.map(function (t) { return new Date(t.time).getTime(); });
-  var minT = Math.min.apply(null, times), maxT = Math.max.apply(null, times);
-  document.getElementById('run-window').textContent =
-    fmtTime(new Date(minT).toISOString()) + ' – ' + fmtTime(new Date(maxT).toISOString()) +
-    ' (' + Math.round((maxT - minT) / 1000) + 's)';
+  // ---------- executing a paper trade ----------
+  function executeTrade(row) {
+    var bq = getQuote(row.buy, row.asset), sq = getQuote(row.sell, row.asset);
+    var size = Number($("size").value), qty = size / row.buyPx;
+    var bf = fill(bq, "buy", qty), sf = fill(sq, "sell", qty), injected = false;
 
-  // ---- venue cards ----
-  var venuesEl = document.getElementById('venues');
-  Object.keys(DATA.venues).forEach(function (id) {
-    var v = DATA.venues[id];
-    var polls = DATA.pollCounts[id] || 0;
-    var card = document.createElement('div');
-    card.className = 'venue-card';
-    card.innerHTML =
-      '<div class="venue-id">' +
-        '<span class="venue-dot" style="background:' + VENUE_COLOR[id] + '"></span>' +
-        '<div><div class="venue-name">' + v.name + '</div>' +
-        '<div class="venue-type">' + v.type + (v.chain ? ' &middot; ' + v.chain : '') + '</div></div>' +
-      '</div>' +
-      '<div class="venue-right">' +
-        '<div class="venue-status">healthy</div>' +
-        '<div class="venue-polls">' + polls + ' polls this run</div>' +
-      '</div>';
-    venuesEl.appendChild(card);
-  });
+    if (S.scen.failNext) {
+      S.scen.failNext = false; $("bFail").classList.remove("active"); injected = true;
+      var pickBuy = Math.random() < 0.5, zero = Math.random() < 0.5, target = pickBuy ? bf : sf;
+      target.filled = zero ? 0 : target.filled * (0.1 + Math.random() * 0.6);
+      log("scen", "injected failure: " + (pickBuy ? "buy" : "sell") + " leg on " + VN[pickBuy ? row.buy : row.sell] + (zero ? " filled 0%" : " filled partially"));
+      note("Leg failure injected. Watch the unwind fire in the log and the trade row.");
+    }
+    if (bf.filled <= 0 && sf.filled <= 0) { log("fail", "no fill on either leg, nothing recorded"); return; }
 
-  // ---- ticker tape ----
-  (function () {
-    var track = document.getElementById('ticker-track');
-    var items = DATA.ticker.map(function (t) {
-      return '<span class="ticker-item">' +
-        '<span class="dot" style="background:' + VENUE_COLOR[t.venue] + '"></span>' +
-        '<span class="sym">' + t.asset + '/USDT</span>' +
-        '<span class="venue-tag">' + DATA.venues[t.venue].name + '</span>' +
-        '<span class="px">$' + t.price.toFixed(4) + '</span>' +
-      '</span>';
-    }).join('');
-    track.innerHTML = items + items; // duplicated for a seamless scroll loop
-  })();
+    var matched = Math.min(bf.filled, sf.filled);
+    var gross = matched * (sf.avg - bf.avg);
+    var fees = explicitFee(bq, bf) + explicitFee(sq, sf);
+    var uw = unwind(row.asset, bq, sq, bf, sf), uloss = uw ? uw.loss : 0;
+    var pnl = gross - fees - uloss;
 
-  // ---- hero metrics + stat strip ----
-  var flattenRate = DATA.totals.unwindFullyFlattened / DATA.totals.unwindEvents;
+    var t = { time: new Date(), asset: row.asset, buy: row.buy, sell: row.sell, matched: matched, pnl: pnl,
+              theo: row.net, bf: bf, sf: sf, uw: uw, injected: injected };
+    S.trades.unshift(t); S.pnl += pnl; S.cum.push(S.pnl);
+    if (uw) { S.unwinds++; S.unwindLoss += uw.loss; if (!uw.full) S.incomplete++; }
 
-  var heroEl = document.getElementById('hero-metrics');
-  var heroes = [
-    { label: 'Total realized P&L', value: fmtUsd(DATA.totals.realized, true), sub: 'vs theoretical ' + fmtUsd(DATA.totals.theoretical, true), cls: DATA.totals.realized < 0 ? 'bad' : 'good' },
-    { label: 'Unwind flatten rate', value: Math.round(flattenRate * 100) + '%', sub: DATA.totals.unwindFullyFlattened + ' / ' + DATA.totals.unwindEvents + ' naked exposures fully flattened', cls: flattenRate === 1 ? 'good' : 'bad' },
-  ];
-  heroes.forEach(function (m) {
-    var el = document.createElement('div');
-    el.className = 'hero-tile ' + m.cls;
-    el.innerHTML =
-      '<div class="metric-label">' + m.label + '</div>' +
-      '<div class="hero-value ' + m.cls + '">' + m.value + '</div>' +
-      '<div class="metric-sub">' + m.sub + '</div>';
-    heroEl.appendChild(el);
-  });
-
-  var stripEl = document.getElementById('stat-strip');
-  stripEl.innerHTML =
-    '<div class="stat-item"><span class="stat-value">' + DATA.totals.opportunitiesScanned + '</span><span class="stat-label">opportunities scanned</span></div>' +
-    '<div class="stat-divider"></div>' +
-    '<div class="stat-item"><span class="stat-value">' + DATA.totals.trades + '</span><span class="stat-label">trades simulated</span></div>' +
-    '<div class="stat-divider"></div>' +
-    '<div class="stat-item"><span class="stat-value">' + DATA.totals.unwindEvents + '</span><span class="stat-label">leg mismatches unwound</span></div>';
-
-  // ---- cumulative pnl sparkline ----
-  (function () {
-    var svg = document.getElementById('pnl-svg');
-    var W = 1000, H = 140, padX = 6, padY = 14;
-    var cum = 0;
-    var pts = DATA.trades.map(function (t, i) {
-      cum += t.realizedPnl;
-      return { i: i, v: cum };
-    });
-    var minV = Math.min(0, Math.min.apply(null, pts.map(function (p) { return p.v; })));
-    var maxV = Math.max(0, Math.max.apply(null, pts.map(function (p) { return p.v; })));
-    var range = (maxV - minV) || 1;
-    function x(i) { return padX + (i / (pts.length - 1)) * (W - padX * 2); }
-    function y(v) { return padY + (1 - (v - minV) / range) * (H - padY * 2); }
-    var zeroY = y(0);
-
-    var linePath = pts.map(function (p, idx) { return (idx === 0 ? 'M' : 'L') + x(p.i).toFixed(1) + ',' + y(p.v).toFixed(1); }).join(' ');
-    var areaPath = linePath + ' L' + x(pts.length - 1).toFixed(1) + ',' + zeroY.toFixed(1) + ' L' + x(0).toFixed(1) + ',' + zeroY.toFixed(1) + ' Z';
-
-    var last = pts[pts.length - 1];
-    var svgns = 'http://www.w3.org/2000/svg';
-
-    var gridLine = document.createElementNS(svgns, 'line');
-    gridLine.setAttribute('x1', padX); gridLine.setAttribute('x2', W - padX);
-    gridLine.setAttribute('y1', zeroY); gridLine.setAttribute('y2', zeroY);
-    gridLine.setAttribute('stroke', 'var(--border)'); gridLine.setAttribute('stroke-dasharray', '3,3');
-    svg.appendChild(gridLine);
-
-    var area = document.createElementNS(svgns, 'path');
-    area.setAttribute('d', areaPath);
-    area.setAttribute('fill', last.v < 0 ? 'var(--bad-soft)' : 'var(--good-soft)');
-    svg.appendChild(area);
-
-    var line = document.createElementNS(svgns, 'path');
-    line.setAttribute('d', linePath);
-    line.setAttribute('fill', 'none');
-    line.setAttribute('stroke', last.v < 0 ? 'var(--bad)' : 'var(--good)');
-    line.setAttribute('stroke-width', '2');
-    line.setAttribute('stroke-linejoin', 'round');
-    line.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(line);
-
-    var dot = document.createElementNS(svgns, 'circle');
-    dot.setAttribute('cx', x(last.i)); dot.setAttribute('cy', y(last.v));
-    dot.setAttribute('r', 4);
-    dot.setAttribute('fill', last.v < 0 ? 'var(--bad)' : 'var(--good)');
-    svg.appendChild(dot);
-
-    document.getElementById('pnl-track-sub').textContent =
-      'trade 1 → ' + pts.length + ', ends at ' + fmtUsd(last.v, true);
-  })();
-
-  // ---- routes ----
-  var routesEl = document.getElementById('routes');
-  var pairs = Object.keys(DATA.pairStats).map(function (k) {
-    var s = DATA.pairStats[k];
-    var parts = k.split(':');
-    var asset = parts[0];
-    var vs = parts[1].split('->');
-    return { key: k, asset: asset, buy: vs[0], sell: vs[1], theoretical: s.theoretical, realized: s.realized, trades: s.trades };
-  }).sort(function (a, b) { return a.realized - b.realized; });
-
-  var maxAbs = Math.max.apply(null, pairs.map(function (p) { return Math.max(Math.abs(p.theoretical), Math.abs(p.realized)); })) || 1;
-
-  pairs.forEach(function (p) {
-    var row = document.createElement('div');
-    row.className = 'route-row';
-    var theoPct = (Math.abs(p.theoretical) / maxAbs) * 100;
-    var realPct = (Math.abs(p.realized) / maxAbs) * 100;
-    var realCls = p.realized < 0 ? 'bad' : 'good';
-    row.innerHTML =
-      '<div class="route-label"><span class="asset">' + p.asset + '</span>' + p.buy + '→' + p.sell + '</div>' +
-      '<div class="route-bars">' +
-        '<div class="route-bar-track">' +
-          '<div class="route-bar-fill realized ' + realCls + '" style="width:' + realPct + '%"></div>' +
-          '<div class="route-bar-marker" style="right:' + theoPct + '%" title="theoretical: ' + fmtUsd(p.theoretical, true) + '"></div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="route-value ' + realCls + '">' + fmtUsd(p.realized, true) + '</div>';
-    routesEl.appendChild(row);
-  });
-
-  // ---- unwind stats ----
-  var uEl = document.getElementById('unwind-stats');
-  var rows = [
-    { k: 'Mismatched trades', v: DATA.totals.unwindEvents + ' / ' + DATA.totals.trades },
-    { k: 'Fully flattened', v: DATA.totals.unwindFullyFlattened, cls: 'good' },
-    { k: 'Incomplete flatten', v: DATA.totals.unwindEvents - DATA.totals.unwindFullyFlattened, cls: (DATA.totals.unwindEvents - DATA.totals.unwindFullyFlattened) > 0 ? 'bad' : 'good' },
-    { k: 'Total unwind cost', v: fmtUsd(DATA.totals.unwindTotalLoss, false), cls: 'bad' },
-  ];
-  rows.forEach(function (r) {
-    var el = document.createElement('div');
-    el.className = 'unwind-stat-row';
-    el.innerHTML = '<span class="k">' + r.k + '</span><span class="v ' + (r.cls || '') + '">' + r.v + '</span>';
-    uEl.appendChild(el);
-  });
-  var fp = flattenRate * 100;
-  document.getElementById('flatten-fill').style.width = fp + '%';
-  document.getElementById('flatten-caption').textContent = Math.round(fp) + '% of naked exposure fully flattened on first attempt';
-  var incompleteTrade = DATA.trades.find(function (t) { return t.fullyFlattened === false; });
-  if (incompleteTrade) {
-    document.getElementById('incomplete-note').innerHTML =
-      '<b>1 incomplete:</b> ' + incompleteTrade.asset + ' ' + incompleteTrade.buyVenue + '→' + incompleteTrade.sellVenue +
-      ' &mdash; the unwind order book ran dry mid-fill. Logged as incomplete rather than assumed resolved:<br>' +
-      '&ldquo;' + incompleteTrade.unwindAction + '&rdquo;';
-  } else {
-    document.getElementById('incomplete-note').style.display = 'none';
+    log("trade", "paper trade " + row.asset + " buy@" + VN[row.buy] + " sell@" + VN[row.sell] + " size $" + size + " theo " + bps(row.net) + "bps realized " + usd(pnl));
+    if (uw) log(uw.full ? "unwind" : "fail", "UNWIND " + uw.action + " cost " + usd(-uw.loss));
+    renderTrades(); renderTiles();
   }
 
-  // ---- trade feed ----
-  var feedBody = document.getElementById('feed-body');
-  var currentFilter = 'all';
-
-  function renderFeed() {
-    feedBody.innerHTML = '';
-    DATA.trades.forEach(function (t, idx) {
-      if (currentFilter === 'mismatched' && !t.mismatched) return;
-      if (currentFilter === 'clean' && t.mismatched) return;
-
-      var pnlCls = t.realizedPnl < 0 ? 'bad' : 'good';
-      var statusHtml;
-      if (!t.mismatched) {
-        statusHtml = '<span class="status-pill clean">clean match</span>';
-      } else if (t.fullyFlattened) {
-        statusHtml = '<span class="status-pill flattened">unwound</span>';
-      } else {
-        statusHtml = '<span class="status-pill incomplete">incomplete</span>';
-      }
-
-      var tr = document.createElement('tr');
-      tr.style.cursor = t.mismatched ? 'pointer' : 'default';
-      tr.innerHTML =
-        '<td class="t-time">' + fmtTime(t.time) + '</td>' +
-        '<td><span class="route-chip">' + t.asset + ' ' +
-          '<span class="dot" style="background:' + VENUE_COLOR[t.buyVenue] + '"></span>' + t.buyVenue +
-          '<span class="arrow">→</span>' +
-          '<span class="dot" style="background:' + VENUE_COLOR[t.sellVenue] + '"></span>' + t.sellVenue +
-        '</span></td>' +
-        '<td class="num">' + t.matchedQty.toFixed(4) + '</td>' +
-        '<td class="num pnl-cell ' + pnlCls + '">' + fmtUsd(t.realizedPnl, true) + '</td>' +
-        '<td>' + statusHtml + '</td>';
-      feedBody.appendChild(tr);
-
-      if (t.mismatched) {
-        var detailTr = document.createElement('tr');
-        detailTr.className = 'detail-row';
-        detailTr.hidden = true;
-        var td = document.createElement('td');
-        td.colSpan = 5;
-        td.innerHTML = '<div class="unwind-detail ' + (t.fullyFlattened ? '' : 'incomplete') + '">' +
-          '<b>buy fill</b> ' + t.buyFilled.toFixed(4) + ' / ' + t.buyRequested.toFixed(4) + ' requested &nbsp;&middot;&nbsp; ' +
-          '<b>sell fill</b> ' + t.sellFilled.toFixed(4) + ' / ' + t.sellRequested.toFixed(4) + ' requested<br>' +
-          t.unwindAction +
-          '</div>';
-        detailTr.appendChild(td);
-        feedBody.appendChild(detailTr);
-
-        tr.addEventListener('click', function () {
-          detailTr.hidden = !detailTr.hidden;
+  // ---------- scan ----------
+  function scan() {
+    var rows = [], t = now();
+    ASSETS.forEach(function (a) {
+      VENUES.forEach(function (b) {
+        VENUES.forEach(function (s) {
+          if (b === s) return;
+          var bq = getQuote(b, a), sq = getQuote(s, a);
+          if (!bq || !sq) return;
+          var bp = buyPx(bq), sp = sellPx(sq);
+          var gross = (sp - bp) / bp * 10000, fees = bq.feeBps + sq.feeBps, net = gross - fees;
+          rows.push({ asset: a, buy: b, sell: s, buyPx: bp, sellPx: sp, gross: gross, fees: fees, net: net, fresh: bq.fresh && sq.fresh });
         });
+      });
+    });
+    rows.sort(function (x, y) { return y.net - x.net; });
+    S.rows = rows;
+
+    var thr = Number($("thr").value);
+    rows.forEach(function (r) {
+      if (!r.fresh || r.net < thr) return;
+      if (S.kill) { r.blocked = true; return; }
+      var key = r.asset + r.buy + r.sell;
+      if (S.cooldown[key] && t - S.cooldown[key] < COOLDOWN_MS) return;
+      S.cooldown[key] = t;
+      executeTrade(r);
+    });
+
+    var live = rows.filter(function (r) { return r.fresh; });
+    var best = live.length ? live[0] : null;
+    S.best.push(best ? best.net : null); if (S.best.length > 90) S.best.shift();
+    renderScan(thr); renderSpark(thr); renderBest(best, thr); renderVenues(); renderTicker();
+  }
+
+  // ---------- rendering ----------
+  function dotHtml(v) { return '<span class="dot" style="background:' + VC[v] + '"></span>'; }
+  function renderScan(thr) {
+    var body = $("scan");
+    if (!S.rows.length) return;
+    body.innerHTML = S.rows.map(function (r) {
+      var tag = !r.fresh ? '<span class="tag stale">stale, excluded</span>'
+        : r.net >= thr ? (S.kill ? '<span class="tag kill">blocked by kill switch</span>' : '<span class="tag trade">clears threshold</span>')
+        : '<span class="tag below">below threshold</span>';
+      var pct = Math.max(-50, Math.min(50, r.net)) + 50, w = Math.abs(Math.max(-50, Math.min(50, r.net)));
+      var barStyle = r.net >= 0 ? "left:50%;width:" + w + "%;background:var(--good)" : "right:50%;width:" + w + "%;background:var(--bad)";
+      return "<tr><td><span class='route'>" + r.asset + " " + dotHtml(r.buy) + VN[r.buy] + "<span class='arrow'>→</span>" + dotHtml(r.sell) + VN[r.sell] + "</span></td>" +
+        "<td class='n'>" + fmt(r.buyPx, r.buyPx < 10 ? 4 : 3) + "</td><td class='n'>" + fmt(r.sellPx, r.sellPx < 10 ? 4 : 3) + "</td>" +
+        "<td class='n'>" + bps(r.gross) + "</td><td class='n'>−" + fmt(r.fees, 1) + "</td>" +
+        "<td class='n " + (r.net >= 0 ? "good" : "bad") + "'>" + bps(r.net) + "<span class='bar'><span class='zero'></span><i style='" + barStyle + "'></i></span></td>" +
+        "<td>" + tag + "</td></tr>";
+    }).join("");
+  }
+  function renderBest(best, thr) {
+    if (!best) { $("tBest").textContent = "—"; $("tBestSub").textContent = "no fresh quotes"; return; }
+    $("tBest").textContent = bps(best.net) + " bps";
+    $("tBest").className = "v " + (best.net >= thr ? "good" : "bad");
+    $("tBestSub").textContent = best.asset + " " + VN[best.buy] + " → " + VN[best.sell];
+  }
+  function renderTiles() {
+    var n = S.trades.length;
+    $("tPnl").textContent = usd(S.pnl); $("tPnl").className = "v " + (S.pnl < 0 ? "bad" : S.pnl > 0 ? "good" : "");
+    $("tPnlSub").textContent = n ? "across " + n + " paper trade" + (n > 1 ? "s" : "") : "no trades yet";
+    $("tTrades").textContent = n; $("tTradesSub").textContent = n ? "last: " + S.trades[0].asset + " " + VN[S.trades[0].buy] + " → " + VN[S.trades[0].sell] : "waiting for an edge";
+    $("tUnw").textContent = S.unwinds;
+    $("tUnwSub").textContent = S.unwinds ? (S.unwinds - S.incomplete) + " flattened, " + S.incomplete + " incomplete, cost $" + S.unwindLoss.toFixed(4) : "no leg mismatches";
+    $("tUnw").className = "v " + (S.incomplete ? "bad" : S.unwinds ? "warnc" : "");
+  }
+  function renderTrades() {
+    var body = $("trades");
+    if (!S.trades.length) return;
+    body.innerHTML = "";
+    S.trades.slice(0, 40).forEach(function (t) {
+      var tr = document.createElement("tr");
+      var st = !t.uw ? '<span class="tag below">clean match</span>' : t.uw.full ? '<span class="tag trade">unwound</span>' : '<span class="tag kill">incomplete</span>';
+      if (t.injected) st += ' <span class="tag stale">injected</span>';
+      tr.innerHTML = "<td>" + t.time.toISOString().substr(11, 8) + "</td><td><span class='route'>" + t.asset + " " + dotHtml(t.buy) + VN[t.buy] + "<span class='arrow'>→</span>" + dotHtml(t.sell) + VN[t.sell] + "</span></td>" +
+        "<td class='n'>" + fmt(t.matched, 4) + "</td><td class='n " + (t.pnl < 0 ? "bad" : "good") + "'>" + usd(t.pnl) + "</td><td>" + st + "</td>";
+      body.appendChild(tr);
+      if (t.uw) {
+        tr.className = "clickable";
+        var d = document.createElement("tr"); d.className = "detail"; d.hidden = true;
+        d.innerHTML = "<td colspan='5'><div class='ud " + (t.uw.full ? "" : "inc") + "'>buy filled " + fmt(t.bf.filled, 4) + " / " + fmt(t.bf.req, 4) + " &middot; sell filled " + fmt(t.sf.filled, 4) + " / " + fmt(t.sf.req, 4) + "<br>" + esc(t.uw.action) + "</div></td>";
+        body.appendChild(d);
+        tr.addEventListener("click", function () { d.hidden = !d.hidden; });
       }
+    });
+    renderCum();
+  }
+  function renderCum() { /* cumulative P&L is shown in the tile; spark shows spreads */ }
+
+  function renderSpark(thr) {
+    var svg = $("spark"), W = 1000, H = 130, pad = 12, vals = S.best.filter(function (v) { return v != null; });
+    if (vals.length < 2) { svg.innerHTML = ""; return; }
+    var lo = Math.min.apply(null, vals.concat([thr])) - 3, hi = Math.max.apply(null, vals.concat([thr])) + 3;
+    var n = S.best.length;
+    function x(i) { return pad + (i / Math.max(1, 89)) * (W - pad * 2) + (90 - n) * 0; }
+    function y(v) { return pad + (1 - (v - lo) / (hi - lo)) * (H - pad * 2); }
+    var d = "", started = false;
+    S.best.forEach(function (v, i) { if (v == null) { started = false; return; } d += (started ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1) + " "; started = true; });
+    var last = S.best[S.best.length - 1], lx = x(S.best.length - 1);
+    svg.innerHTML =
+      '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + y(thr) + '" y2="' + y(thr) + '" stroke="var(--accent)" stroke-dasharray="5,4" stroke-width="1.5"/>' +
+      '<text x="' + (W - pad) + '" y="' + (y(thr) - 5) + '" text-anchor="end" font-size="11" fill="var(--accent)" font-family="IBM Plex Mono, monospace">threshold ' + thr + ' bps</text>' +
+      '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="var(--border)" stroke-width="1"/>' +
+      '<path d="' + d + '" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round"/>' +
+      (last != null ? '<circle cx="' + lx + '" cy="' + y(last) + '" r="4" fill="' + (last >= thr ? "var(--good)" : "var(--bad)") + '"/>' : "");
+  }
+
+  function renderVenues() {
+    var el = $("venues"); el.innerHTML = "";
+    VENUES.forEach(function (v) {
+      var st = S.status[v] || {}, frozen = now() < S.scen.freezeUntil && v === "bybit";
+      var cls = frozen ? "stale" : st.ok ? "ok" : "err", txt = frozen ? "feed frozen" : st.ok ? "healthy" : (st.error ? "error" : "connecting");
+      var d = document.createElement("div"); d.className = "venue-card";
+      d.innerHTML = "<div><div class='venue-name'>" + dotHtml(v) + VN[v] + "</div><div class='venue-type'>" + VT[v] + "</div></div>" +
+        "<div class='venue-right'><span class='st " + cls + "'>" + txt + "</span><br>" + (st.latencyMs != null ? st.latencyMs + " ms" : "") + (st.error ? "<br>" + esc(st.error) : "") + "</div>";
+      el.appendChild(d);
+    });
+  }
+  function renderTicker() {
+    var items = [];
+    VENUES.forEach(function (v) { ASSETS.forEach(function (a) {
+      var q = getQuote(v, a); if (!q) return;
+      var px = q.bids ? (q.bids[0][0] + q.asks[0][0]) / 2 : q.price;
+      items.push('<span class="ticker-item">' + dotHtml(v) + '<span class="sym">' + a + '/USDT</span><span>' + VN[v] + '</span><span class="px">$' + fmt(px, px < 10 ? 4 : 3) + '</span></span>');
+    }); });
+    if (!items.length) return;
+    var h = items.join(""); $("ticker").innerHTML = h + h;
+  }
+
+  // ---------- polling ----------
+  function poll() {
+    var t0 = now();
+    fetch("/api/quotes", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then(function (data) {
+      S.polls++; S.lastLatency = now() - t0;
+      VENUES.forEach(function (v) {
+        var vd = data.venues[v]; S.status[v] = { ok: vd.ok, latencyMs: vd.latencyMs, error: vd.error };
+        if (now() < S.scen.freezeUntil && v === "bybit") return;
+        Object.keys(vd.quotes).forEach(function (a) {
+          var q = vd.quotes[a]; q.fetchedAt = now(); S.raw[v + "|" + a] = q;
+        });
+        if (!vd.ok && !S.status[v].loggedErr) { S.status[v].loggedErr = true; log("fail", VN[v] + " feed error: " + vd.error); }
+      });
+      $("pollInfo").textContent = "poll #" + S.polls + " · " + S.lastLatency + " ms round trip";
+      scan();
+    }).catch(function (err) {
+      $("pollInfo").textContent = "poll failed: " + err.message; log("fail", "price proxy unreachable: " + err.message);
     });
   }
 
-  renderFeed();
-
-  document.getElementById('filters').addEventListener('click', function (e) {
-    var btn = e.target.closest('.filter-btn');
-    if (!btn) return;
-    document.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    renderFeed();
+  // ---------- scenarios ----------
+  function note(msg) { $("scenNote").textContent = msg; }
+  function timedBtn(id, key, ms, label, onStart) {
+    $(id).addEventListener("click", function () {
+      S.scen[key] = now() + ms; $(id).classList.add("active"); onStart();
+      setTimeout(function () { if (now() >= S.scen[key]) { $(id).classList.remove("active"); log("scen", label + " ended"); scan(); } }, ms + 100);
+      scan();
+    });
+  }
+  timedBtn("bSpread", "spreadUntil", 20000, "forced spread", function () {
+    log("scen", "forced spread: Raydium SOL pool now priced ~65 bps cheap for 20s"); note("Raydium SOL is artificially cheap. Buy there, sell on a CEX bid. If the net clears your threshold the bot trades within a poll.");
+    if (Number($("thr").value) > 5) { $("thr").value = 5; $("thrOut").textContent = "5 bps"; }
   });
+  timedBtn("bThin", "thinUntil", 20000, "thin books", function () {
+    log("scen", "thin books: CEX depth cut to 4% for 20s"); note("CEX books are nearly empty. Try a $5,000+ trade size: one leg will only partly fill, which forces an unwind.");
+  });
+  timedBtn("bStale", "freezeUntil", 20000, "Bybit freeze", function () {
+    log("scen", "Bybit feed frozen for 20s (simulating a dead connection)"); note("Bybit stops updating. After 8 s its quotes count as stale and every route through it is excluded. The bot refuses to mix stale with fresh prices.");
+  });
+  $("bFail").addEventListener("click", function () {
+    S.scen.failNext = true; $("bFail").classList.add("active");
+    log("scen", "armed: the next paper trade will have one leg failed"); note("Armed. Force a spread or lower the threshold so a trade fires, then check the unwind.");
+  });
+  $("bKill").addEventListener("click", function () {
+    S.kill = !S.kill; $("bKill").classList.toggle("active", S.kill); $("killBanner").classList.toggle("show", S.kill);
+    $("modePill").className = "pill " + (S.kill ? "bad" : "live"); $("modePill").textContent = S.kill ? "kill switch tripped" : "live prices · paper trading";
+    log("scen", S.kill ? "KILL SWITCH tripped, trading halted" : "kill switch reset"); note(S.kill ? "Trading halted. Rows that would trade show 'blocked by kill switch'." : "Kill switch cleared.");
+    scan();
+  });
+  $("bReset").addEventListener("click", function () {
+    S.scen = { spreadUntil: 0, thinUntil: 0, freezeUntil: 0, failNext: false }; S.kill = false;
+    S.trades = []; S.pnl = 0; S.cum = [0]; S.unwinds = 0; S.unwindLoss = 0; S.incomplete = 0; S.cooldown = {};
+    ["bSpread", "bFail", "bThin", "bStale", "bKill"].forEach(function (id) { $(id).classList.remove("active"); });
+    $("killBanner").classList.remove("show"); $("modePill").className = "pill live"; $("modePill").textContent = "live prices · paper trading";
+    $("trades").innerHTML = '<tr><td colspan="5" class="empty">No trades yet. Lower the threshold or force a spread.</td></tr>';
+    renderTiles(); log("sys", "reset"); note("Everything cleared."); scan();
+  });
+  $("thr").addEventListener("input", function () { $("thrOut").textContent = this.value + " bps"; scan(); });
+
+  log("sys", "console started, polling every " + POLL_MS / 1000 + "s");
+  poll(); setInterval(poll, POLL_MS);
+  setInterval(function () { if (S.rows.length) scan(); }, 1000);
 })();
 </script>
-
 </body>
 </html>
