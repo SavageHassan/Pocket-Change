@@ -132,6 +132,31 @@
     </div>
   </div>
 
+  <div class="panel" id="botPanel">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <div><p class="panel-title" style="margin-bottom:2px">Your real bot</p><p class="panel-sub" style="margin:0">What the bot running on your machine is doing, read straight from its own event log.</p></div>
+      <span class="pill warn" id="botPill">not connected</span>
+    </div>
+    <div id="botOff" class="scen-note">Not connected. In two terminals on your machine run <code>npm start -- --mode=paper</code> and <code>npm run bridge</code>. This panel fills in on its own within a few seconds. Works in Chrome or Firefox (Safari blocks pages from reaching localhost).</div>
+    <div id="botOn" hidden>
+      <div class="hero" style="margin-bottom:14px">
+        <div class="tile"><div class="label">Venue polls</div><div class="v" id="bPolls">0</div><div class="s" id="bPollsSub">&nbsp;</div></div>
+        <div class="tile"><div class="label">Spreads logged</div><div class="v" id="bOpps">0</div><div class="s">above the bot's threshold</div></div>
+        <div class="tile"><div class="label">Bot paper trades</div><div class="v" id="bTrades">0</div><div class="s" id="bTradesSub">&nbsp;</div></div>
+        <div class="tile"><div class="label">Bot realized P&amp;L</div><div class="v" id="bPnl">$0.0000</div><div class="s" id="bUnw">0 unwinds</div></div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <p class="panel-sub" style="margin-bottom:6px">Latest spread per route, as the bot saw it</p>
+          <div class="tbl-wrap"><table><thead><tr><th>Route</th><th class="n">Buy</th><th class="n">Sell</th><th class="n">Net</th><th class="n">Seen</th></tr></thead><tbody id="bOppRows"></tbody></table></div>
+          <p class="panel-sub" style="margin:12px 0 6px">Bot paper trades</p>
+          <div class="tbl-wrap"><table><thead><tr><th>Time</th><th>Route</th><th class="n">Matched</th><th class="n">Realized</th><th>Status</th></tr></thead><tbody id="bTradeRows"></tbody></table></div>
+        </div>
+        <div><p class="panel-sub" style="margin-bottom:6px">Bot event log</p><div class="log" id="bLog"></div></div>
+      </div>
+    </div>
+  </div>
+
   <div class="banner kill" id="killBanner"><b>Kill switch tripped.</b> Detection keeps running, but no paper trades will execute until you reset it.</div>
 
   <div class="venues" id="venues"></div>
@@ -527,6 +552,64 @@
     renderTiles(); log("sys", "reset"); note("Everything cleared."); scan();
   });
   $("thr").addEventListener("input", function () { $("thrOut").textContent = this.value + " bps"; scan(); });
+
+  // ---------- your real bot (read from the local bridge) ----------
+  var BRIDGE = "http://127.0.0.1:8787", B = { since: 0, on: false, polls: 0, pollBy: {}, opps: {}, oppCount: 0, trades: [], tradeCount: 0, pnl: 0, unw: 0, inc: 0, lines: [] };
+  function bLine(time, kind, msg) {
+    B.lines.push({ t: String(time).substr(11, 8), k: kind, m: msg }); if (B.lines.length > 80) B.lines.shift();
+  }
+  function bHandle(e) {
+    var ev = e.event;
+    if (ev === "system" && e.venue) { B.polls++; B.pollBy[e.venue] = (B.pollBy[e.venue] || 0) + 1; }
+    else if (ev === "system") { bLine(e.time, "sys", e.msg); }
+    else if (ev === "kill_switch") { bLine(e.time, "fail", "kill switch: " + e.reason); }
+    else if (ev === "opportunity_detected") {
+      B.oppCount++; B.opps[e.assetId + e.buyVenueId + e.sellVenueId] = e;
+    } else if (ev === "paper_trade") {
+      B.trades.unshift(e); B.tradeCount++; if (B.trades.length > 15) B.trades.pop(); B.pnl += e.realizedPnlUsd;
+      bLine(e.time, "trade", "paper trade " + e.assetId + " " + e.buyVenueId + "→" + e.sellVenueId + " realized " + usd(e.realizedPnlUsd));
+    } else if (ev === "unwind") {
+      B.unw++; if (e.fullyFlattened === false) B.inc++;
+      bLine(e.time, e.fullyFlattened === false ? "fail" : "unwind", "UNWIND " + e.actionTaken);
+    } else if (ev === "failure") {
+      bLine(e.time, "fail", (e.venue || "") + " " + (e.stage || "") + " " + (e.message || e.error || e.retMsg || ""));
+    }
+  }
+  function bRender() {
+    $("botOff").hidden = B.on; $("botOn").hidden = !B.on;
+    var pill = $("botPill");
+    if (!B.on) { pill.className = "pill warn"; pill.textContent = "not connected"; return; }
+    pill.className = "pill " + (B.active ? "live" : "warn"); pill.textContent = B.active ? "bot running" : "connected, bot idle";
+    $("bPolls").textContent = B.polls;
+    $("bPollsSub").textContent = Object.keys(B.pollBy).map(function (v) { return (VN[v] || v) + " " + B.pollBy[v]; }).join(" · ") || " ";
+    $("bOpps").textContent = B.oppCount;
+    $("bTrades").textContent = B.tradeCount;
+    $("bTradesSub").textContent = B.trades.length ? "last: " + B.trades[0].assetId + " " + B.trades[0].buyVenueId + "→" + B.trades[0].sellVenueId : "none yet";
+    $("bPnl").textContent = usd(B.pnl); $("bPnl").className = "v " + (B.pnl < 0 ? "bad" : B.pnl > 0 ? "good" : "");
+    $("bUnw").textContent = B.unw + " unwind" + (B.unw === 1 ? "" : "s") + (B.inc ? ", " + B.inc + " incomplete" : "");
+
+    var rows = Object.keys(B.opps).map(function (k) { return B.opps[k]; }).sort(function (a, b) { return b.netSpreadBps - a.netSpreadBps; });
+    $("bOppRows").innerHTML = rows.length ? rows.map(function (o) {
+      var age = Math.max(0, Math.round((now() - o.detectedAt) / 1000));
+      return "<tr><td><span class='route'>" + o.assetId + " " + dotHtml(o.buyVenueId) + (VN[o.buyVenueId] || o.buyVenueId) + "<span class='arrow'>→</span>" + dotHtml(o.sellVenueId) + (VN[o.sellVenueId] || o.sellVenueId) + "</span></td>" +
+        "<td class='n'>" + fmt(o.buyPrice, o.buyPrice < 10 ? 4 : 3) + "</td><td class='n'>" + fmt(o.sellPrice, o.sellPrice < 10 ? 4 : 3) + "</td>" +
+        "<td class='n " + (o.netSpreadBps >= 0 ? "good" : "bad") + "'>" + bps(o.netSpreadBps) + "</td><td class='n'>" + age + "s ago</td></tr>";
+    }).join("") : "<tr><td colspan='5' class='empty'>Nothing logged yet. The bot only logs spreads above its own threshold (default 5 bps). Start it with <code>MIN_NET_SPREAD_BPS=-100</code> to log every route.</td></tr>";
+    $("bTradeRows").innerHTML = B.trades.length ? B.trades.map(function (t) {
+      var mism = Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9;
+      return "<tr><td>" + String(t.time).substr(11, 8) + "</td><td><span class='route'>" + t.assetId + " " + dotHtml(t.buyVenueId) + (VN[t.buyVenueId] || t.buyVenueId) + "<span class='arrow'>→</span>" + dotHtml(t.sellVenueId) + (VN[t.sellVenueId] || t.sellVenueId) + "</span></td>" +
+        "<td class='n'>" + fmt(t.matchedQty, 4) + "</td><td class='n " + (t.realizedPnlUsd < 0 ? "bad" : "good") + "'>" + usd(t.realizedPnlUsd) + "</td><td>" + (mism ? '<span class="tag trade">unwound</span>' : '<span class="tag below">clean match</span>') + "</td></tr>";
+    }).join("") : "<tr><td colspan='5' class='empty'>No paper trades yet.</td></tr>";
+    var lg = $("bLog"); lg.innerHTML = B.lines.map(function (l) { return '<div><span class="t">' + l.t + '</span> <span class="k-' + l.k + '">' + esc(l.m) + "</span></div>"; }).join("");
+    lg.scrollTop = lg.scrollHeight;
+  }
+  function pollBot() {
+    fetch(BRIDGE + "/events?since=" + B.since, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.total < B.since) { B.polls = 0; B.pollBy = {}; B.opps = {}; B.oppCount = 0; B.trades = []; B.tradeCount = 0; B.pnl = 0; B.unw = 0; B.inc = 0; B.lines = []; B.since = 0; }
+      d.events.forEach(bHandle); B.since += d.events.length; B.on = true; B.active = d.botActive; bRender();
+    }).catch(function () { if (B.on) { B.on = false; } bRender(); });
+  }
+  pollBot(); setInterval(pollBot, 2000);
 
   log("sys", "console started, polling every " + POLL_MS / 1000 + "s");
   poll(); setInterval(poll, POLL_MS);

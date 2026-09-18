@@ -41,6 +41,22 @@ MIN_NET_SPREAD_BPS=-100000 npm start -- --mode=paper
 Stop with `Ctrl+C`, or by creating a `KILL_SWITCH` file in the project root
 (the manual-trigger kill switch, FR-8, polls for this file every scan cycle).
 
+## Watching the real bot on the dashboard
+
+The dashboard's "Your real bot" panel reads your bot's own event log through
+a small read-only bridge (it can't control the bot or place anything, and it
+only listens on 127.0.0.1). In two terminals:
+
+```bash
+npm start -- --mode=paper     # the bot
+npm run bridge                # serves logs/events.jsonl on localhost:8787
+```
+
+Then open the Vercel page (or `public/index.html` via any static server) in
+Chrome or Firefox; the panel connects on its own. Start the bot with
+`MIN_NET_SPREAD_BPS=-100` to log every route, since it only logs spreads above
+its threshold (default 5 bps). Safari blocks pages from reaching localhost.
+
 ## Run modes
 
 - `npm start` / `--mode=detect` — **M0, implemented.** Live detection + logging only.
