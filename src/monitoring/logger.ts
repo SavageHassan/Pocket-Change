@@ -8,8 +8,13 @@ import type { Opportunity, PaperTrade } from "../types/index.js";
 
 mkdirSync("logs", { recursive: true });
 
+// sync: true — short-lived one-shot scripts (M3's devnet/Bybit test scripts)
+// can call process.exit() moments after a log call, which races pino's
+// default async file destination before its "ready" event fires ("sonic
+// boom is not ready yet"). Our log volume is low enough that synchronous
+// writes cost nothing meaningful, and it removes this whole failure class.
 const destination = pino.multistream([
-  { stream: pino.destination({ dest: "logs/events.jsonl", mkdir: true }) },
+  { stream: pino.destination({ dest: "logs/events.jsonl", mkdir: true, sync: true }) },
   { stream: process.stdout },
 ]);
 

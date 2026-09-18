@@ -11,14 +11,24 @@
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "setup:devnet-pool": "tsx scripts/setup-devnet-pool.ts",
+    "test:devnet-swap": "tsx scripts/devnet-dex-test.ts",
+    "test:bybit-demo": "tsx scripts/bybit-demo-test.ts",
+    "test:mock-atomic-swap": "tsx scripts/mock-test-atomic-swap.ts",
+    "test:mock-bybit": "tsx scripts/mock-test-bybit.ts"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.15",
+    "@solana/spl-token-swap": "^0.4.4",
+    "@solana/web3.js": "^1.99.0",
+    "bs58": "^4.0.1",
     "dotenv": "^16.4.5",
     "pino": "^9.4.0",
     "pino-pretty": "^11.2.2"
   },
   "devDependencies": {
+    "@types/bs58": "^4.0.4",
     "@types/node": "^22.5.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4"

@@ -24,6 +24,11 @@ npm-debug.log*
 *.db
 data/
 
+# M3: devnet pool config is environment-specific (holds this machine's
+# generated mint/pool addresses), not secret but not portable — regenerate
+# with `npm run setup:devnet-pool` rather than committing it.
+devnet-pool.json
+
 # OS / editor
 .DS_Store
 .vscode/

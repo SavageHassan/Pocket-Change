@@ -1,19 +1,21 @@
 # crypto-arb-bot
 
 Multi-venue crypto arbitrage bot, built per `SRS_MultiExchange_Arbitrage_Bot_v2.md`
-(v2 SRS). Currently at **M2**: live market data ingestion across three
-venues, opportunity detection, paper trading with realistic fill
-simulation, and a stress-tested unwind procedure. No wallet, no exchange
-API keys, no order placement anywhere in these milestones.
+(v2 SRS). M0–M2 (detection, paper trading, unwind) are complete and verified
+against live venues. **M3 (devnet/testnet execution) is code-complete and
+verified against mocks, but not yet run end-to-end against real devnet/Bybit
+infrastructure** — see the status note in "Path to M3" below for exactly
+where it stands and why. Still no mainnet, no real capital, anywhere.
 
-## Status: M2 complete
+## Status: M0–M2 complete, M3 in progress
 
 - Venues: [Raydium](https://raydium.io) (Solana DEX) + [MEXC](https://www.mexc.com) + [Bybit](https://www.bybit.com) (CEXs)
 - Assets: SOL/USDT (all three venues), RAY/USDT (Raydium + MEXC — not listed on Bybit; see `src/config/assets.ts`, adding an asset/venue is a config edit + one adapter file, not a core change)
 - **M0:** detects cross-venue price spreads, computes fee-adjusted net spread, logs every opportunity (profitable or not) as structured JSON
 - **M1:** every opportunity that clears the profit threshold is re-priced through realistic fill simulation — order-book depth walk for CEX legs, pool-slippage model for the Raydium leg — and the hypothetical result (matched quantity, fees, realized P&L) is logged and tracked per venue-pair
 - **M2:** second CEX adapter (Bybit) live; `--stress-test` deliberately corrupts leg fills to exercise FR-5.4's unwind procedure on demand, which now actually simulates the offsetting order (not just logs the mismatch) and tracks whether the exposure was fully flattened
-- Still no trading — all three milestones only observe, simulate, and log
+- **M3:** real atomic-transaction pipeline (Solana devnet) and real order submission (Bybit Demo Trading) are written and passing mock-based logic tests; blocked on external infra to prove end-to-end (see below)
+- No trading with real capital anywhere in M0–M3
 
 ## Setup
 
@@ -84,22 +86,26 @@ summary. A verification run with `--stress-test` (see below) produced 35
 unwind events across 40 trades, 34 fully flattened and 1 incomplete — every
 mismatch got a response, none were left as a silent naked position.
 
-## Path to M3 (devnet/testnet execution)
+## Path to M3 (devnet/testnet execution) — current status
 
-M3 needs, on top of what exists:
-1. A Solana devnet wallet + RPC connection, and real atomic transaction
-   building for the Raydium leg (FR-4.1/4.3) — simulate-before-submit, with
-   an on-chain minimum-output guard, using devnet funds only.
-2. Real order submission to MEXC/Bybit sandbox or testnet APIs, if
-   available for spot (needs a specific check at M3 time — availability
-   changes).
-3. Wiring `VenueAdapter.placeOrder`/`getOrderStatus` for real, replacing the
-   `NotImplementedError` stubs — the interface shape doesn't change, only
-   the implementation.
-4. The kill switch's automatic triggers (FR-8.4 per-venue error rate,
-   FR-8.5 elevated unwind rate) become meaningful once there's live
-   execution and unwind history to compute rates from — M2's manual trigger
-   and unwind tracking are the prerequisite state for this.
+**What exists and is verified:**
+- `src/execution/wallet.ts` — generates/loads a devnet-only Solana keypair, connects to devnet, requests an airdrop if underfunded.
+- `src/execution/atomicSwap.ts` — the real FR-4.1/4.3 pipeline: build the swap instruction, **simulate before submit**, classify a simulated failure as a guard rejection (the on-chain `minimumAmountOut` check) vs. a generic failure, only submit+confirm on a clean simulation.
+- `scripts/setup-devnet-pool.ts` — one-time provisioning: mints two devnet test tokens and creates a Token-Swap pool between them (see Deviations below for why not literally Raydium).
+- `scripts/devnet-dex-test.ts` — runs one real trade that should confirm, then one deliberately-impossible trade that must be rejected, against that pool.
+- `src/adapters/cex/bybit.ts` — `placeOrder`/`getBalances`/`getOrderStatus` now make real signed v5 API calls against `api-demo.bybit.com` (Bybit's Demo Trading sandbox) instead of throwing `NotImplementedError`. It refuses to run without `BYBIT_API_KEY`/`BYBIT_API_SECRET` and has no code path to any mainnet trading endpoint.
+- `scripts/bybit-demo-test.ts` — places one real demo order and polls its status.
+- **`npm run test:mock-atomic-swap` and `npm run test:mock-bybit`** — 19 checks total, all passing, verifying the logic above (simulate/submit branching, guard-rejection classification, request signing, response parsing, credential-gating) against faked RPC/HTTP responses. These prove the code is *correct*; they do not prove Bybit's or Solana devnet's real infrastructure accepts our requests.
+
+**What's blocking the real (unmocked) run, and why it's not a code problem:**
+- Solana's public devnet faucet (`api.devnet.solana.com`) is rate-limited/dry from the environment this was built in — `npm run setup:devnet-pool` gets as far as generating and saving a devnet wallet, then the airdrop call fails with HTTP 429. The wallet's address is printed by the script; fund it yourself with `solana airdrop 1 <address> --url devnet` or via https://faucet.solana.com (that page needs a captcha, which isn't something to script around), then re-run the setup script — it picks up the existing wallet and continues.
+- Bybit Demo Trading needs an API key generated from *your* Bybit account (Demo Trading mode) — that's account access I don't have and shouldn't try to get. Put it in `.env` and run `npm run test:bybit-demo`.
+
+Once either is unblocked, re-run the corresponding script and the real (not mocked) result replaces this note.
+
+**Remaining after that:**
+1. Wiring `RaydiumAdapter.placeOrder`/`getOrderStatus` for real stays out of scope — see Deviations for why devnet can't validate against the actual mainnet Raydium pools this bot tracks.
+2. The kill switch's automatic triggers (FR-8.4 per-venue error rate, FR-8.5 elevated unwind rate) become meaningful once there's live execution and unwind history to compute rates from — M2's manual trigger and unwind tracking are the prerequisite state for this, still pending real trigger conditions.
 
 Per your original instructions: stop after M3 and report status before
 touching mainnet or real capital — nothing past devnet/testnet execution is
@@ -110,9 +116,9 @@ in scope without your explicit go-ahead in a later session.
 **M0/M1/M2 (now):** nothing. All three adapters hit public, unauthenticated APIs.
 
 **M3 (devnet/testnet execution):**
-- `SOLANA_DEVNET_RPC_URL` — a Solana devnet RPC endpoint
-- `SOLANA_WALLET_PRIVATE_KEY` — a **devnet-only** keypair, funded with devnet SOL from a faucet, never a mainnet key
-- MEXC sandbox/testnet API key + secret if MEXC offers one for spot (verify current availability — this needs a specific check at M3 time); scoped trading-only, withdrawals disabled (FR-10.3)
+- Nothing for the Solana side — `SOLANA_WALLET_PRIVATE_KEY` is generated and saved to `.env` automatically the first time you run an execution script. You only need to fund the printed address with devnet SOL (see above) if the automatic airdrop fails.
+- `BYBIT_API_KEY` / `BYBIT_API_SECRET` — a **Demo Trading** key from your own Bybit account (account menu → Demo Trading → API), never a real trading key.
+- MEXC has no sandbox/testnet at all (confirmed against their current docs) — there's no key to supply; it stays detect/paper-only.
 
 All secrets load from a git-ignored `.env` (see `.env.example` for the full list with inline explanations). Nothing is ever hardcoded.
 
@@ -127,10 +133,11 @@ src/
     cex/        MexcAdapter, BybitAdapter (M2)
   ingestion/    polls adapters, tracks per-venue freshness (FR-1.5)
   engine/       opportunityDetector (FR-2), fillSimulator + paperTradingEngine (FR-9.1, M1), unwindSimulator + legFailureInjector (FR-5.4, M2)
-  execution/    empty — M3+
+  execution/    wallet.ts + atomicSwap.ts (FR-4.1/4.3, M3 devnet pipeline)
   capital/      empty — M4+ (real capital allocation, FR-6)
   monitoring/   structured JSON logger (FR-7), kill switch (FR-8), pnlTracker (FR-7.6, M1), unwindTracker (FR-7.5, M2)
   cli.ts        entrypoint, --mode and --stress-test flags
+scripts/        M3 one-shot provisioning/test scripts (setup-devnet-pool, devnet-dex-test, bybit-demo-test) + mock-test-* (no external infra needed)
 ```
 
 Every adapter implements the same `VenueAdapter` interface
@@ -260,14 +267,48 @@ writing a new file in `adapters/`, not touching `engine/` or `ingestion/`.
     unwind-rate threshold, whenever it's tuned in M3+, should be calibrated
     from real execution data, not this number).
 
-## Non-negotiables carried forward (not yet exercised in M0/M1/M2)
+13. **M3's DEX leg validates against the classic SPL Token-Swap program on
+    devnet, not Raydium.** Confirmed by checking Raydium's own devnet
+    program ID before building: it exists, but none of the pools this bot
+    tracks (SOL/USDT, RAY/USDT) are deployed there — those only exist on
+    mainnet. Building a real Raydium pool from scratch on devnet needs an
+    OpenBook market as a prerequisite, a materially heavier task than
+    validating the same atomic-tx/simulate/min-output-guard mechanics
+    against a simpler, equally-real on-chain swap program. This was an
+    explicit tradeoff you chose over building a real Raydium devnet pool —
+    the atomic-transaction *pipeline* is proven either way; the specific
+    program it's proven against is not Raydium's.
 
-These are honored in the type/interface design now so M3 doesn't require
-rework, even though M0/M1/M2 have no real execution path to exercise them:
+14. **M3's real (unmocked) execution scripts are written, typechecked, and
+    logic-verified via mocks, but have not yet been run end-to-end against
+    live devnet/Bybit** — blocked on external infra (a rate-limited public
+    devnet faucet; a Bybit Demo Trading key that has to come from your own
+    account), not a code gap. See "Path to M3" above for exactly what's
+    proven vs. still pending, and what unblocks each.
 
-- `VenueAdapter.placeOrder`/`getOrderStatus` exist in the interface and
-  throw `NotImplementedError` in both adapters — the shape is fixed, the
-  implementation is deliberately deferred.
-- The atomic-DEX and hedged-CEX-unwind execution models (FR-4.1/4.3,
-  FR-5.2–5.5) aren't implemented yet; M2 is where the unwind procedure gets
-  built and stress-tested in paper mode per your milestone plan.
+15. **A real bug was caught and fixed while building the mock tests, not
+    just a deviation — worth flagging.** Short-lived scripts calling
+    `process.exit()` shortly after a log call could crash with "sonic boom
+    is not ready yet": pino's default file destination writes
+    asynchronously, and exiting before its first write completes races the
+    stream. Fixed by making the destination synchronous
+    (`monitoring/logger.ts`) — our log volume is far too low for the
+    throughput cost to matter, and it removes the failure class everywhere,
+    not just in the script that first exposed it.
+
+## Non-negotiables carried forward
+
+- `VenueAdapter.placeOrder`/`getOrderStatus`: real for `BybitAdapter`
+  (Demo Trading, M3) and for the devnet Token-Swap pipeline
+  (`execution/atomicSwap.ts`); still `NotImplementedError` for
+  `RaydiumAdapter` and `MexcAdapter` (see Deviations #13/#14 for why, and
+  the M3 status note for what unblocks Bybit's real run).
+- The atomic-DEX execution model (FR-4.1/4.3: simulate-before-submit,
+  on-chain minimum-output guard) is implemented and mock-verified in
+  `execution/atomicSwap.ts`. The hedged-CEX-unwind model (FR-5.2–5.5) is
+  implemented and stress-tested in paper mode (M2); wiring it to real
+  execution instead of simulated fills is M4+ scope.
+- No code path anywhere in this repo points at a mainnet trading endpoint
+  or a mainnet Solana cluster — `execution/wallet.ts` hardcodes devnet,
+  and `adapters/cex/bybit.ts`'s signed requests only ever target
+  `api-demo.bybit.com`.

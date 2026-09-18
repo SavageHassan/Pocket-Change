@@ -3,8 +3,9 @@ import { NotImplementedError } from "../../types/index.js";
 import { ASSET_UNIVERSE } from "../../config/assets.js";
 import { config } from "../../config/env.js";
 import { logger } from "../../monitoring/logger.js";
+import { DEMO_BASE_URL, signRequest } from "./bybitSigning.js";
 
-const API_BASE = "https://api.bybit.com";
+const API_BASE = "https://api.bybit.com"; // public market data only — never used for signed/order requests
 const DEPTH_LEVELS_SUMMED = 5;
 
 interface BybitDepthResponse {
@@ -16,6 +17,24 @@ interface BybitDepthResponse {
     b: [string, string][]; // bids
     ts: number;
   };
+}
+
+interface BybitV5Response<T> {
+  retCode: number;
+  retMsg: string;
+  result: T;
+}
+
+interface BybitWalletBalanceResult {
+  list: Array<{ coin: Array<{ coin: string; walletBalance: string; locked: string }> }>;
+}
+
+interface BybitOrderCreateResult {
+  orderId: string;
+}
+
+interface BybitOrderRealtimeResult {
+  list: Array<{ side: "Buy" | "Sell"; qty: string; cumExecQty: string; orderStatus: string }>;
 }
 
 /**
@@ -85,16 +104,110 @@ export class BybitAdapter implements VenueAdapter {
     return { takerBps: config.bybitTakerFeeBps };
   }
 
+  private requireCreds(): { apiKey: string; apiSecret: string } {
+    if (!config.bybitApiKey || !config.bybitApiSecret) {
+      throw new NotImplementedError(
+        "BybitAdapter execution (set BYBIT_API_KEY/BYBIT_API_SECRET in .env to a Demo Trading key — see README for how to create one; never a mainnet key)",
+      );
+    }
+    return { apiKey: config.bybitApiKey, apiSecret: config.bybitApiSecret };
+  }
+
+  /** M3: real request against Bybit's Demo Trading sandbox (api-demo.bybit.com) — no real funds, but a real signed order. */
   async getBalances(): Promise<Balance[]> {
-    throw new NotImplementedError("BybitAdapter.getBalances (no API key wired until M3)");
+    const { apiKey, apiSecret } = this.requireCreds();
+    const query = "accountType=UNIFIED";
+    const headers = signRequest(apiKey, apiSecret, query);
+    const res = await fetch(`${DEMO_BASE_URL}/v5/account/wallet-balance?${query}`, { headers });
+    const body = (await res.json()) as BybitV5Response<BybitWalletBalanceResult>;
+    if (body.retCode !== 0) {
+      throw new Error(`Bybit demo wallet-balance error: retCode=${body.retCode} ${body.retMsg}`);
+    }
+    const coins = body.result?.list?.[0]?.coin ?? [];
+    return coins.map((c: { coin: string; walletBalance: string; locked: string }) => ({
+      venueId: this.venue.id,
+      assetId: c.coin,
+      available: Number(c.walletBalance) - Number(c.locked || 0),
+      locked: Number(c.locked || 0),
+      lastReconciledAt: Date.now(),
+    }));
   }
 
-  async placeOrder(_assetId: string, _side: LegSide, _qty: number): Promise<Leg> {
-    throw new NotImplementedError("BybitAdapter.placeOrder (execution not enabled before M3)");
+  async placeOrder(assetId: string, side: LegSide, qty: number): Promise<Leg> {
+    const { apiKey, apiSecret } = this.requireCreds();
+    const assetCfg = ASSET_UNIVERSE.find((a) => a.canonicalAssetId === assetId && a.bybit);
+    if (!assetCfg?.bybit) throw new Error(`${assetId} has no Bybit symbol configured`);
+
+    const body = JSON.stringify({
+      category: "spot",
+      symbol: assetCfg.bybit.symbol,
+      side: side === "buy" ? "Buy" : "Sell",
+      orderType: "Market",
+      qty: qty.toString(),
+    });
+    const headers = signRequest(apiKey, apiSecret, body);
+    logger.tradeAttempt({ venue: this.venue.id, stage: "submit", assetId, side, qty, sandbox: "demo-trading" });
+
+    const res = await fetch(`${DEMO_BASE_URL}/v5/order/create`, { method: "POST", headers, body });
+    const result = (await res.json()) as BybitV5Response<BybitOrderCreateResult>;
+    if (result.retCode !== 0) {
+      logger.failure({ venue: this.venue.id, stage: "submit", retCode: result.retCode, retMsg: result.retMsg });
+      return {
+        tradeId: "",
+        legId: "",
+        venueId: this.venue.id,
+        side,
+        requestedQty: qty,
+        filledQty: 0,
+        status: "failed",
+        timestamp: Date.now(),
+      };
+    }
+
+    const orderId = result.result.orderId;
+    logger.tradeAttempt({ venue: this.venue.id, stage: "accepted", orderId, sandbox: "demo-trading" });
+    return {
+      tradeId: orderId,
+      legId: orderId,
+      venueId: this.venue.id,
+      side,
+      requestedQty: qty,
+      filledQty: 0, // unknown until getOrderStatus polls it
+      status: "pending",
+      timestamp: Date.now(),
+    };
   }
 
-  async getOrderStatus(_legId: string): Promise<Leg> {
-    throw new NotImplementedError("BybitAdapter.getOrderStatus (execution not enabled before M3)");
+  async getOrderStatus(legId: string): Promise<Leg> {
+    const { apiKey, apiSecret } = this.requireCreds();
+    const query = `category=spot&orderId=${legId}`;
+    const headers = signRequest(apiKey, apiSecret, query);
+    const res = await fetch(`${DEMO_BASE_URL}/v5/order/realtime?${query}`, { headers });
+    const body = (await res.json()) as BybitV5Response<BybitOrderRealtimeResult>;
+    if (body.retCode !== 0) {
+      throw new Error(`Bybit demo order-status error: retCode=${body.retCode} ${body.retMsg}`);
+    }
+    const order = body.result?.list?.[0];
+    if (!order) throw new Error(`No order found for ${legId}`);
+
+    const statusMap: Record<string, Leg["status"]> = {
+      New: "pending",
+      PartiallyFilled: "partially_filled",
+      Filled: "filled",
+      Cancelled: "cancelled",
+      Rejected: "failed",
+    };
+
+    return {
+      tradeId: legId,
+      legId,
+      venueId: this.venue.id,
+      side: order.side === "Buy" ? "buy" : "sell",
+      requestedQty: Number(order.qty),
+      filledQty: Number(order.cumExecQty ?? 0),
+      status: statusMap[order.orderStatus] ?? "pending",
+      timestamp: Date.now(),
+    };
   }
 }
 

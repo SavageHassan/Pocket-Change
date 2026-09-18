@@ -36,4 +36,11 @@ export const config = {
   // M1 (FR-9.1): hypothetical trade size used to simulate fills against
   // real order-book/pool depth. No real capital is ever at risk in --mode=paper.
   paperTradeSizeUsd: num("PAPER_TRADE_SIZE_USD", 500),
+
+  // M3: Bybit Demo Trading (api-demo.bybit.com) — a real order-submission
+  // sandbox with no real funds, NOT the same as a mainnet key. Absent by
+  // default; execution scripts refuse to run without it rather than
+  // silently falling back to anything mainnet-shaped.
+  bybitApiKey: process.env.BYBIT_API_KEY,
+  bybitApiSecret: process.env.BYBIT_API_SECRET,
 };
