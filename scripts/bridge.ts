@@ -1,5 +1,6 @@
 import http from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 /**
  * Read-only bridge: serves the bot's structured event log (logs/events.jsonl)
@@ -8,6 +9,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
  * bot is doing. It only reads the log; it can't control the bot or place
  * anything. Bound to 127.0.0.1, so nothing outside this machine can reach it.
  *
+ *   GET /                  -> the dashboard itself (open http://127.0.0.1:8787 — same-origin, no browser blocking)
+ *   GET /api/quotes        -> live venue prices (same handler Vercel runs)
  *   GET /health            -> { ok, total, lastEventAt, botActive }
  *   GET /events?since=N    -> { total, events: [...] } (events after line N, max 300)
  */
@@ -30,7 +33,10 @@ function readEvents(): Record<string, unknown>[] {
   return out;
 }
 
-const server = http.createServer((req, res) => {
+const pageFile = fileURLToPath(new URL("../public/index.html", import.meta.url));
+const quotesModule = await import(new URL("../api/quotes.js", import.meta.url).href);
+
+const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Headers", "*");
@@ -40,6 +46,17 @@ const server = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
+  if (url.pathname === "/") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(readFileSync(pageFile));
+  }
+  if (url.pathname === "/api/quotes") {
+    const shim = {
+      setHeader: (k: string, v: string) => res.setHeader(k, v),
+      status: (c: number) => ({ json: (o: unknown) => { res.writeHead(c, { "Content-Type": "application/json" }); res.end(JSON.stringify(o)); } }),
+    };
+    return quotesModule.default(req, shim);
+  }
   const events = readEvents();
   const last = events[events.length - 1];
   const lastEventAt = last?.time ? new Date(String(last.time)).getTime() : null;
@@ -61,5 +78,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`bridge listening on http://127.0.0.1:${PORT} (reading ${LOG_FILE})`);
+  console.log(`open the dashboard: http://127.0.0.1:${PORT}`);
   console.log("start the bot in another terminal: npm start -- --mode=paper");
 });

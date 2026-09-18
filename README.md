@@ -52,10 +52,13 @@ npm start -- --mode=paper     # the bot
 npm run bridge                # serves logs/events.jsonl on localhost:8787
 ```
 
-Then open the Vercel page (or `public/index.html` via any static server) in
-Chrome or Firefox; the panel connects on its own. Start the bot with
+Then open **http://127.0.0.1:8787** — the bridge serves the dashboard itself, so
+the real-bot panel, live prices and scenario buttons all work in one place with
+no browser blocking. (The Vercel-hosted copy can also read the bridge, but
+browsers may block a public page from reaching localhost; that path is
+untested. Safari blocks it outright.) Start the bot with
 `MIN_NET_SPREAD_BPS=-100` to log every route, since it only logs spreads above
-its threshold (default 5 bps). Safari blocks pages from reaching localhost.
+its threshold (default 5 bps).
 
 ## Run modes
 

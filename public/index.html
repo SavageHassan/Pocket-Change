@@ -554,7 +554,7 @@
   $("thr").addEventListener("input", function () { $("thrOut").textContent = this.value + " bps"; scan(); });
 
   // ---------- your real bot (read from the local bridge) ----------
-  var BRIDGE = "http://127.0.0.1:8787", B = { since: 0, on: false, polls: 0, pollBy: {}, opps: {}, oppCount: 0, trades: [], tradeCount: 0, pnl: 0, unw: 0, inc: 0, lines: [] };
+  var BRIDGE = (location.hostname === "127.0.0.1" || location.hostname === "localhost") && location.port === "8787" ? location.origin : "http://127.0.0.1:8787", B = { since: 0, on: false, polls: 0, pollBy: {}, opps: {}, oppCount: 0, trades: [], tradeCount: 0, pnl: 0, unw: 0, inc: 0, lines: [] };
   function bLine(time, kind, msg) {
     B.lines.push({ t: String(time).substr(11, 8), k: kind, m: msg }); if (B.lines.length > 80) B.lines.shift();
   }
