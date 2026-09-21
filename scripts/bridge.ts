@@ -1,6 +1,8 @@
 import http from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import "dotenv/config";
+import { startRelay } from "../src/monitoring/relay.js";
 
 /**
  * Read-only bridge: serves the bot's structured event log (logs/events.jsonl)
@@ -75,6 +77,10 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404);
   res.end(JSON.stringify({ error: "not found" }));
 });
+
+if (process.env.RELAY_URL && process.env.RELAY_TOKEN) {
+  startRelay({ url: process.env.RELAY_URL, token: process.env.RELAY_TOKEN, intervalMs: Number(process.env.RELAY_INTERVAL_MS ?? 8000) });
+}
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`bridge listening on http://127.0.0.1:${PORT} (reading ${LOG_FILE})`);

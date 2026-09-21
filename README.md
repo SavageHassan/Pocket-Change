@@ -102,6 +102,27 @@ Bybit stay paper. Every trade record says which legs were real.
   error, and the trade is handled as a failed leg. Selling SOL also needs SOL in
   the demo account; if it has none, sell legs will be rejected and unwound.
 
+## Showing your bot on the Vercel page (cloud relay)
+
+Browsers often block a public https page from reaching `localhost`, so the
+Vercel page can't read your bridge directly. The relay fixes that: the bot's
+status snapshot (counters, latest spreads, recent paper trades, log lines,
+capital status; no keys, no raw logs) is pushed to a small Redis store, and the
+page reads it from there. It works in any browser.
+
+One-time setup:
+1. **Vercel dashboard -> your project -> Storage -> Create Database -> Upstash Redis**, and connect it to the project. That adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` automatically.
+2. **Settings -> Environment Variables:** add `RELAY_TOKEN` = any long random string (for example `openssl rand -hex 24`).
+3. **Redeploy** (Deployments -> ... -> Redeploy) so the functions see the new variables.
+4. In your local `.env` add `RELAY_URL=https://pocket-change-six.vercel.app` and the **same** `RELAY_TOKEN`.
+5. Run the bot and `npm run bridge` as usual. The bridge now also relays. (`npm run relay` does only the relay.)
+
+The Vercel page then shows "bot running · via cloud". It pushes only when
+something changed (about every 8s while the bot runs; `RELAY_INTERVAL_MS` to slow
+it) to stay inside free Redis limits. `/api/ingest` needs the token to write;
+`/api/bot` is read-only and public, and only ever holds paper-trading status.
+`npm run test:relay` checks the plumbing (20 checks, fake Redis/network).
+
 ## Watching the real bot on the dashboard
 
 The dashboard's "Your real bot" panel reads your bot's own event log through

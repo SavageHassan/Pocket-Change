@@ -2,7 +2,17 @@
   "buildCommand": "echo 'static console + api functions, nothing to build'",
   "outputDirectory": "public",
   "functions": {
-    "api/quotes.js": { "maxDuration": 10 }
+    "api/quotes.js": {
+      "maxDuration": 10
+    },
+    "api/ingest.js": {
+      "maxDuration": 10
+    },
+    "api/bot.js": {
+      "maxDuration": 10
+    }
   },
-  "regions": ["fra1"]
+  "regions": [
+    "fra1"
+  ]
 }

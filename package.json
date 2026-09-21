@@ -19,7 +19,9 @@
     "test:mock-bybit": "tsx scripts/mock-test-bybit.ts",
     "test:m4": "tsx scripts/test-m4.ts",
     "test:mock-demo": "tsx scripts/mock-test-demo.ts",
-    "bridge": "tsx scripts/bridge.ts"
+    "bridge": "tsx scripts/bridge.ts",
+    "relay": "tsx scripts/relay.ts",
+    "test:relay": "tsx scripts/test-relay.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.15",

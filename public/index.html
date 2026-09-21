@@ -595,8 +595,12 @@
   function bRender() {
     $("botOff").hidden = B.on; $("botOn").hidden = !B.on;
     var pill = $("botPill");
-    if (!B.on) { pill.className = "pill warn"; pill.textContent = "not connected"; return; }
-    pill.className = "pill " + (B.active ? "live" : "warn"); pill.textContent = B.active ? (B.liveDemo ? "bot running \u00b7 live-demo" : "bot running") : "connected, bot idle";
+    if (!B.on) {
+      pill.className = "pill warn"; pill.textContent = "not connected";
+      $("botOff").innerHTML = (cloudNote ? esc(cloudNote) + " " : "") + "Otherwise, in two terminals on your machine run <code>npm start -- --mode=paper</code> and <code>npm run bridge</code>, then open <code>http://127.0.0.1:8787</code>.";
+      return;
+    }
+    pill.className = "pill " + (B.active ? "live" : "warn"); pill.textContent = (B.active ? (B.liveDemo ? "bot running \u00b7 live-demo" : "bot running") : "connected, bot idle") + (B.via === "cloud" ? " \u00b7 via cloud" : "");
     $("bPolls").textContent = B.polls;
     $("bPollsSub").textContent = Object.keys(B.pollBy).map(function (v) { return (VN[v] || v) + " " + B.pollBy[v]; }).join(" · ") || " ";
     $("bOpps").textContent = B.oppCount;
@@ -641,8 +645,24 @@
   function pollBot() {
     fetch(BRIDGE + "/events?since=" + B.since, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.total < B.since) { B.polls = 0; B.pollBy = {}; B.opps = {}; B.oppCount = 0; B.cap = null; B.trades = []; B.tradeCount = 0; B.pnl = 0; B.unw = 0; B.inc = 0; B.lines = []; B.since = 0; }
-      d.events.forEach(bHandle); B.since += d.events.length; B.on = true; B.active = d.botActive; bRender();
-    }).catch(function () { if (B.on) { B.on = false; } bRender(); });
+      d.events.forEach(bHandle); B.since += d.events.length; B.on = true; B.via = "local"; B.active = d.botActive; bRender();
+    }).catch(function () { pollCloud(); });
+  }
+  // No local bridge reachable (e.g. the browser blocks a public page from touching localhost): read the snapshot the bot pushed to the cloud relay.
+  var cloudNote = "";
+  function pollCloud() {
+    fetch("/api/bot", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.configured) { B.on = false; cloudNote = "The cloud relay isn't set up on this site yet (see README)."; }
+      else if (!j.snapshot) { B.on = false; cloudNote = "Cloud relay is set up, but your bot hasn't pushed anything yet. Run npm run bridge (with RELAY_URL and RELAY_TOKEN in .env) next to the bot."; }
+      else {
+        var sn = j.snapshot;
+        B.polls = sn.polls; B.pollBy = sn.pollBy; B.oppCount = sn.oppCount; B.opps = {};
+        sn.opps.forEach(function (o) { B.opps[o.assetId + o.buyVenueId + o.sellVenueId] = o; });
+        B.trades = sn.trades; B.tradeCount = sn.tradeCount; B.pnl = sn.pnl; B.unw = sn.unw; B.inc = sn.inc; B.lines = sn.lines; B.cap = sn.cap; B.liveDemo = sn.liveDemo;
+        B.on = true; B.via = "cloud"; B.active = (j.serverNow - sn.lastEventAt) < 20000; B.since = 0;
+      }
+      bRender();
+    }).catch(function () { B.on = false; bRender(); });
   }
   pollBot(); setInterval(pollBot, 2000);
 
