@@ -7,6 +7,8 @@ import { runPaperTradingCycle } from "./engine/paperTradingEngine.js";
 import { KillSwitch } from "./monitoring/killswitch.js";
 import { PnLTracker } from "./monitoring/pnlTracker.js";
 import { UnwindTracker } from "./monitoring/unwindTracker.js";
+import { RiskMonitor } from "./monitoring/riskMonitor.js";
+import { CapitalManager } from "./capital/capitalManager.js";
 import { logger } from "./monitoring/logger.js";
 import { config } from "./config/env.js";
 
@@ -29,7 +31,7 @@ function parseStressTest(): boolean {
 const SCAN_INTERVAL_MS = 3000;
 const SUMMARY_EVERY_N_SCANS = 5;
 
-function buildIngestion(): IngestionService {
+function buildIngestion(onPollResult?: (venueId: string, ok: boolean) => void): IngestionService {
   const raydium = new RaydiumAdapter();
   const mexc = new MexcAdapter();
   const bybit = new BybitAdapter();
@@ -37,7 +39,7 @@ function buildIngestion(): IngestionService {
     raydium: config.raydiumPollMs,
     mexc: config.mexcPollMs,
     bybit: config.bybitPollMs,
-  });
+  }, onPollResult);
 }
 
 async function runDetectMode(): Promise<void> {
@@ -76,29 +78,39 @@ async function runDetectMode(): Promise<void> {
 }
 
 async function runPaperMode(stressTest: boolean): Promise<void> {
-  const ingestion = buildIngestion();
   const killSwitch = new KillSwitch();
+  const capital = new CapitalManager(new Set(["mexc", "bybit"])); // CEX custody is capped (FR-6.4); the DEX wallet is self-custody
+  const risk = new RiskMonitor(killSwitch, capital);
+  const ingestion = buildIngestion((venueId, ok) => risk.recordVenueResult(venueId, ok));
   const pnlTracker = new PnLTracker();
   const unwindTracker = new UnwindTracker();
 
   ingestion.start();
-  logger.system("M1/M2 paper trading mode started", {
+  logger.system("M4 paper trading mode started", {
     venues: ingestion.listVenueIds(),
     scanIntervalMs: SCAN_INTERVAL_MS,
     tradeSizeUsd: config.paperTradeSizeUsd,
     stressTest,
+    limits: {
+      maxTradeUsd: config.maxTradeUsd,
+      custodyCapPct: config.custodyCapPct,
+      maxSessionLossUsd: config.maxSessionLossUsd,
+      unwindRateThreshold: config.unwindRateThreshold,
+      unwindRateWindow: config.unwindRateWindow,
+    },
   });
-  console.log(`paper trading mode — simulating $${config.paperTradeSizeUsd} trades against live order-book/pool depth. No real orders are placed.`);
+  console.log(`paper trading mode — simulating $${Math.min(config.paperTradeSizeUsd, config.maxTradeUsd)} trades against live order-book/pool depth. No real orders are placed.`);
+  console.log(`risk limits: session loss $${config.maxSessionLossUsd}, unwind rate >${config.unwindRateThreshold * 100}% over ${config.unwindRateWindow} trades, CEX custody cap ${config.custodyCapPct}%`);
   if (stressTest) {
     console.log("*** --stress-test ACTIVE: leg fills are being synthetically corrupted to exercise the FR-5.4 unwind path. Not real market behavior. ***");
+    console.log("*** Expect the FR-8.5 auto kill switch to trip quickly under stress-test; that is the safety net working. ***");
   }
 
   let scanCount = 0;
   const scanLoop = setInterval(async () => {
     killSwitch.pollFileFlag();
-    if (killSwitch.isTripped()) return;
 
-    const trades = await runPaperTradingCycle(ingestion, pnlTracker, unwindTracker, { injectFailures: stressTest });
+    const trades = await runPaperTradingCycle(ingestion, pnlTracker, unwindTracker, { capital, risk, kill: killSwitch }, { injectFailures: stressTest });
     for (const t of trades) {
       const sign = t.realizedPnlUsd >= 0 ? "+" : "";
       const mismatch = Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9 ? " [LEG MISMATCH -> UNWOUND]" : "";
@@ -109,23 +121,46 @@ async function runPaperMode(stressTest: boolean): Promise<void> {
     }
 
     scanCount += 1;
-    if (scanCount % SUMMARY_EVERY_N_SCANS === 0 && pnlTracker.tradeCount() > 0) {
-      console.log(`--- P&L summary (${pnlTracker.tradeCount()} simulated trades, total realized $${pnlTracker.totalRealizedPnlUsd().toFixed(4)}) ---`);
-      for (const s of pnlTracker.summary()) {
-        console.log(`  ${s.key}: ${s.trades} trades, theoretical $${s.theoreticalPnlUsd.toFixed(4)}, realized $${s.realizedPnlUsd.toFixed(4)}`);
+    if (scanCount % 10 === 0) risk.reconcile();
+    if (scanCount % SUMMARY_EVERY_N_SCANS === 0) {
+      const snap = capital.snapshot();
+      logger.capital({
+        ...snap,
+        kill: { tripped: killSwitch.isTripped(), reason: killSwitch.tripReason() },
+        haltedVenues: killSwitch.haltedVenues(),
+        unwindRate: risk.unwindRate(),
+        sessionPnlUsd: pnlTracker.totalRealizedPnlUsd(),
+        limits: { maxSessionLossUsd: config.maxSessionLossUsd, unwindRateThreshold: config.unwindRateThreshold, unwindRateWindow: config.unwindRateWindow },
+      });
+      if (pnlTracker.tradeCount() > 0) {
+        console.log(`--- P&L summary (${pnlTracker.tradeCount()} simulated trades, total realized $${pnlTracker.totalRealizedPnlUsd().toFixed(4)}) ---`);
+        for (const s of pnlTracker.summary()) {
+          console.log(`  ${s.key}: ${s.trades} trades, theoretical $${s.theoreticalPnlUsd.toFixed(4)}, realized $${s.realizedPnlUsd.toFixed(4)}`);
+        }
+        if (unwindTracker.count() > 0) {
+          console.log(
+            `--- Unwind summary (FR-5.4/7.5): ${unwindTracker.count()} events, ${unwindTracker.incompleteFlattenCount()} incomplete, total realized loss $${unwindTracker.totalRealizedLossUsd().toFixed(4)} ---`,
+          );
+        }
       }
-      if (unwindTracker.count() > 0) {
-        console.log(
-          `--- Unwind summary (FR-5.4/7.5): ${unwindTracker.count()} events, ${unwindTracker.incompleteFlattenCount()} incomplete, total realized loss $${unwindTracker.totalRealizedLossUsd().toFixed(4)} ---`,
-        );
-      }
+      console.log(
+        `--- Capital (paper ledger): $${snap.totalUsd.toFixed(0)} total; ` +
+          snap.venues.map((v) => `${v.venue} ${v.sharePct.toFixed(0)}%`).join(", ") +
+          (snap.breaches.length ? `; CUSTODY BREACH: ${snap.breaches.map((b) => b.venue).join(",")}` : "") +
+          (killSwitch.haltedVenues().length ? `; HALTED: ${killSwitch.haltedVenues().map((h) => h.venue).join(",")}` : "") +
+          ` ---`,
+      );
     }
   }, SCAN_INTERVAL_MS);
 
-  killSwitch.onTrip(() => {
+  killSwitch.onTrip((reason) => {
+    if (killSwitch.isAutomatic()) {
+      console.log(`\n*** AUTO KILL SWITCH: ${reason}. No new trades will execute; detection and monitoring keep running. Ctrl+C to exit. ***\n`);
+      return;
+    }
     clearInterval(scanLoop);
     ingestion.stop();
-    logger.system("M1/M2 paper trading mode stopped (kill switch)", {
+    logger.system("M4 paper trading mode stopped (kill switch)", {
       totalTrades: pnlTracker.tradeCount(),
       totalRealizedPnlUsd: pnlTracker.totalRealizedPnlUsd(),
       totalUnwindEvents: unwindTracker.count(),

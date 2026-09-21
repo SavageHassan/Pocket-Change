@@ -20,6 +20,7 @@ export class IngestionService {
   constructor(
     private readonly adapters: PollableVenueAdapter[],
     private readonly pollIntervalsMs: Record<string, number>,
+    private readonly onPollResult?: (venueId: string, ok: boolean) => void,
   ) {}
 
   start(): void {
@@ -28,7 +29,9 @@ export class IngestionService {
       const poll = async () => {
         try {
           await adapter.refresh();
+          this.onPollResult?.(adapter.venue.id, true);
         } catch (err) {
+          this.onPollResult?.(adapter.venue.id, false);
           logger.failure({
             venue: adapter.venue.id,
             stage: "ingestion_poll",

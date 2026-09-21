@@ -20,6 +20,8 @@ export interface UnwindResult {
   event: UnwindEvent;
   unwindFill: FillResult;
   fullyFlattened: boolean;
+  venueId: string;
+  side: "buy" | "sell";
 }
 
 /**
@@ -76,5 +78,11 @@ export function simulateUnwind(
     timestamp: Date.now(),
   };
 
-  return { event, unwindFill, fullyFlattened };
+  return {
+    event,
+    unwindFill,
+    fullyFlattened,
+    venueId: netExposure > 0 ? buyVenueQuote.venueId : sellVenueQuote.venueId,
+    side: netExposure > 0 ? "sell" : "buy",
+  };
 }

@@ -2,12 +2,14 @@
 
 Multi-venue crypto arbitrage bot, built per `SRS_MultiExchange_Arbitrage_Bot_v2.md`
 (v2 SRS). M0–M2 (detection, paper trading, unwind) are complete and verified
-against live venues. **M3 (devnet/testnet execution) is code-complete and
+against live venues. **M4's safety layer (capital controls, automatic kill
+switches, monitoring) is built and tested; live order placement is
+deliberately NOT enabled.** **M3 (devnet/testnet execution) is code-complete and
 verified against mocks, but not yet run end-to-end against real devnet/Bybit
 infrastructure** — see the status note in "Path to M3" below for exactly
 where it stands and why. Still no mainnet, no real capital, anywhere.
 
-## Status: M0–M2 complete, M3 in progress
+## Status: M0–M2 complete, M4 safety layer built, M3 in progress
 
 - Venues: [Raydium](https://raydium.io) (Solana DEX) + [MEXC](https://www.mexc.com) + [Bybit](https://www.bybit.com) (CEXs)
 - Assets: SOL/USDT (all three venues), RAY/USDT (Raydium + MEXC — not listed on Bybit; see `src/config/assets.ts`, adding an asset/venue is a config edit + one adapter file, not a core change)
@@ -15,7 +17,8 @@ where it stands and why. Still no mainnet, no real capital, anywhere.
 - **M1:** every opportunity that clears the profit threshold is re-priced through realistic fill simulation — order-book depth walk for CEX legs, pool-slippage model for the Raydium leg — and the hypothetical result (matched quantity, fees, realized P&L) is logged and tracked per venue-pair
 - **M2:** second CEX adapter (Bybit) live; `--stress-test` deliberately corrupts leg fills to exercise FR-5.4's unwind procedure on demand, which now actually simulates the offsetting order (not just logs the mismatch) and tracks whether the exposure was fully flattened
 - **M3:** real atomic-transaction pipeline (Solana devnet) and real order submission (Bybit Demo Trading) are written and passing mock-based logic tests; blocked on external infra to prove end-to-end (see below)
-- No trading with real capital anywhere in M0–M3
+- **M4 (safety layer only):** paper capital ledger with pre-positioned balances per venue, hard CEX custody cap, per-trade size ceiling, reconciliation, and automatic kill switches (unwind rate, session loss, per-venue feed errors, custody, drift). See "M4 safety layer" below. Live order placement is not part of it.
+- No trading with real capital anywhere
 
 ## Setup
 
@@ -40,6 +43,33 @@ MIN_NET_SPREAD_BPS=-100000 npm start -- --mode=paper
 
 Stop with `Ctrl+C`, or by creating a `KILL_SWITCH` file in the project root
 (the manual-trigger kill switch, FR-8, polls for this file every scan cycle).
+
+## M4 safety layer (capital controls + automatic kill switches)
+
+M4 in the SRS is where real capital first touches the bot. What's built here is
+the control layer that has to exist first — on the **paper** ledger. Nothing in
+it can place or move real money, and the codebase still has no path to a
+mainnet trading endpoint.
+
+- **Pre-positioned capital (FR-6.1, FR-3.7)** — `capital/capitalManager.ts` seeds each venue with USDT and each asset it lists (defaults: $5,000 USDT and $5,000 of each asset per venue). Before any trade it checks USDT exists on the buy venue and the asset on the sell venue; otherwise the trade is rejected and logged. Every fill, including the unwind's offsetting order, updates the ledger.
+- **Custody cap (FR-6.4)** — a CEX holding more than `CUSTODY_CAP_PCT` (50%) of total capital is halted. The DEX wallet is self-custody and uncapped.
+- **Per-trade ceiling** — `MAX_TRADE_USD` (1000).
+- **Utilization / rebalancing (FR-6.3)** — venues drained below 15% of their starting USDT or asset are flagged with what to top up. Actual rebalancing needs withdrawals, which this codebase deliberately doesn't implement.
+- **Reconciliation** — every 10 scans the ledger is compared with what each venue reports; drift over `RECONCILE_TOLERANCE_PCT` halts that venue. In paper mode "what the venue reports" is the ledger itself, so this only fires in tests (`scripts/test-m4.ts` injects drift) until there is a real balance API to compare against.
+- **Automatic kill switches (FR-8.4 / 8.5)** — `monitoring/riskMonitor.ts`:
+  - unwind rate over `UNWIND_RATE_THRESHOLD` (50%) across `UNWIND_RATE_WINDOW` (10) trades trips the **global** switch
+  - realized session loss reaching `MAX_SESSION_LOSS_USD` (100) trips the global switch
+  - `VENUE_ERROR_THRESHOLD` (5) feed errors in `VENUE_ERROR_WINDOW_MS` halts **that venue only**; `VENUE_RECOVERY_SUCCESSES` (3) clean polls resume it
+  - Automatic trips stop new trades but keep the process running so monitoring stays visible. Manual trips (Ctrl+C, `KILL_SWITCH` file) still exit.
+- **Monitoring** — the bot logs a `capital_status` snapshot every 15s and `risk_event`s (auto kills, halts, rejections, drift). The dashboard's "Your real bot" panel shows them.
+
+**Verified:** `npm run test:m4` (24 checks: each control fires when it should and stays quiet when it shouldn't), plus live runs against the real feeds: `--stress-test` tripped the unwind-rate kill after 10 trades at a 90% unwind rate; a normal run with every route allowed to trade at a negative edge (`MIN_NET_SPREAD_BPS=-100`) tripped the session-loss limit at about -$102 after 78 trades.
+
+**Two things to know when reading the numbers:**
+- Because of these limits, `--stress-test` now stops trading quickly by design. Raise `UNWIND_RATE_THRESHOLD` to 1 and `MAX_SESSION_LOSS_USD` high if you want the old long-running stress demo.
+- Ledger equity moves with the price of the inventory held at each venue, not only with trade P&L, so it won't match the P&L tracker. That price exposure is a real cost of pre-positioning capital.
+
+**Not built (needs your decision, and real credentials):** live order submission on a real exchange, real balance fetching, and real rebalancing transfers. The SRS's "small real capital" part of M4 depends on those.
 
 ## Watching the real bot on the dashboard
 
@@ -228,7 +258,7 @@ writing a new file in `adapters/`, not touching `engine/` or `ingestion/`.
    partial-fill... scenarios, not just idealized full fills") and isn't
    pretended to be solved here.
 
-7. **Kill switch (FR-8) is scaffolded but only the manual trigger is live**
+7. **(Superseded by M4 — the automatic triggers are now implemented; see "M4 safety layer".) Kill switch (FR-8) was scaffolded with only the manual trigger live**
    in M0 (`Ctrl+C` or a `KILL_SWITCH` file). The automatic triggers —
    per-venue error-rate (FR-8.4) and elevated-unwind-rate (FR-8.5) — are
    stubbed methods that throw if called; they need state (error-rate

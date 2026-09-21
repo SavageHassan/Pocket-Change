@@ -39,6 +39,12 @@ export const logger = {
   failure(payload: Record<string, unknown>) {
     base.error({ event: "failure", ...payload }, "failure");
   },
+  capital(payload: Record<string, unknown>) {
+    base.info({ event: "capital_status", ...payload }, "capital status");
+  },
+  risk(payload: Record<string, unknown>) {
+    base.warn({ event: "risk_event", ...payload }, "risk event");
+  },
   unwind(payload: Record<string, unknown>) {
     base.warn({ event: "unwind", ...payload }, "unwind event");
   },

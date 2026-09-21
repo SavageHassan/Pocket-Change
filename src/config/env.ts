@@ -37,6 +37,20 @@ export const config = {
   // real order-book/pool depth. No real capital is ever at risk in --mode=paper.
   paperTradeSizeUsd: num("PAPER_TRADE_SIZE_USD", 500),
 
+  // M4 capital & risk controls (FR-6, FR-8.4/8.5). All paper-ledger only:
+  // nothing here moves or spends real money.
+  startCapitalUsdPerVenue: num("START_CAPITAL_USD_PER_VENUE", 5000), // USDT pre-positioned at each venue
+  startAssetUsdPerVenue: num("START_ASSET_USD_PER_VENUE", 5000), // base-asset value pre-positioned per venue, per asset
+  custodyCapPct: num("CUSTODY_CAP_PCT", 50), // FR-6.4: max share of total capital on any single CEX
+  maxTradeUsd: num("MAX_TRADE_USD", 1000), // hard per-trade notional ceiling
+  maxSessionLossUsd: num("MAX_SESSION_LOSS_USD", 100), // realized loss that trips the global kill switch
+  unwindRateThreshold: num("UNWIND_RATE_THRESHOLD", 0.5), // FR-8.5: unwinds/trades over the window that trips the kill switch
+  unwindRateWindow: num("UNWIND_RATE_WINDOW", 10), // trades in the rolling window
+  venueErrorThreshold: num("VENUE_ERROR_THRESHOLD", 5), // FR-8.4: feed errors within the window that halt one venue
+  venueErrorWindowMs: num("VENUE_ERROR_WINDOW_MS", 60000),
+  venueRecoverySuccesses: num("VENUE_RECOVERY_SUCCESSES", 3), // clean polls before a halted venue resumes
+  reconcileTolerancePct: num("RECONCILE_TOLERANCE_PCT", 0.5), // balance drift (% of venue value) that halts a venue
+
   // M3: Bybit Demo Trading (api-demo.bybit.com) — a real order-submission
   // sandbox with no real funds, NOT the same as a mainnet key. Absent by
   // default; execution scripts refuse to run without it rather than
