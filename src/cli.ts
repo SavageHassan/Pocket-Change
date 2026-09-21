@@ -9,6 +9,7 @@ import { PnLTracker } from "./monitoring/pnlTracker.js";
 import { UnwindTracker } from "./monitoring/unwindTracker.js";
 import { RiskMonitor } from "./monitoring/riskMonitor.js";
 import { CapitalManager } from "./capital/capitalManager.js";
+import { BybitDemoExecutor } from "./execution/bybitDemoExecutor.js";
 import { logger } from "./monitoring/logger.js";
 import { config } from "./config/env.js";
 
@@ -26,6 +27,10 @@ function parseMode(): Mode {
 
 function parseStressTest(): boolean {
   return process.argv.includes("--stress-test");
+}
+
+function parseLiveDemo(): boolean {
+  return process.argv.includes("--live-demo");
 }
 
 const SCAN_INTERVAL_MS = 3000;
@@ -77,7 +82,24 @@ async function runDetectMode(): Promise<void> {
   });
 }
 
-async function runPaperMode(stressTest: boolean): Promise<void> {
+async function runPaperMode(stressTest: boolean, liveDemo: boolean): Promise<void> {
+  let bybitLive: BybitDemoExecutor | undefined;
+  if (liveDemo) {
+    if (!config.bybitApiKey || !config.bybitApiSecret) {
+      console.error("--live-demo needs BYBIT_API_KEY and BYBIT_API_SECRET in .env: a Demo Trading key from YOUR Bybit account (Demo Trading mode -> API). See README. Never a real-money key.");
+      process.exit(1);
+    }
+    const adapter = new BybitAdapter();
+    try {
+      const balances = await adapter.getBalances(); // real call to api-demo.bybit.com: proves the key and account work before we trade
+      const usdt = balances.find((b) => b.assetId === "USDT");
+      console.log(`Bybit Demo account reachable. USDT available: ${usdt ? usdt.available.toFixed(2) : "none"}; coins held: ${balances.filter((b) => b.available > 0).map((b) => b.assetId).join(", ") || "none"}`);
+    } catch (err) {
+      console.error(`--live-demo could not use the Bybit Demo account: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    bybitLive = new BybitDemoExecutor(adapter);
+  }
   const killSwitch = new KillSwitch();
   const capital = new CapitalManager(new Set(["mexc", "bybit"])); // CEX custody is capped (FR-6.4); the DEX wallet is self-custody
   const risk = new RiskMonitor(killSwitch, capital);
@@ -86,6 +108,7 @@ async function runPaperMode(stressTest: boolean): Promise<void> {
   const unwindTracker = new UnwindTracker();
 
   ingestion.start();
+  if (liveDemo) logger.system("live-demo enabled: Bybit legs place real orders on Bybit Demo Trading (play funds)", { event: "live_demo", tradeUsd: config.demoTradeUsd, maxOrdersPerMin: config.demoMaxOrdersPerMin });
   logger.system("M4 paper trading mode started", {
     venues: ingestion.listVenueIds(),
     scanIntervalMs: SCAN_INTERVAL_MS,
@@ -101,6 +124,9 @@ async function runPaperMode(stressTest: boolean): Promise<void> {
   });
   console.log(`paper trading mode — simulating $${Math.min(config.paperTradeSizeUsd, config.maxTradeUsd)} trades against live order-book/pool depth. No real orders are placed.`);
   console.log(`risk limits: session loss $${config.maxSessionLossUsd}, unwind rate >${config.unwindRateThreshold * 100}% over ${config.unwindRateWindow} trades, CEX custody cap ${config.custodyCapPct}%`);
+  if (liveDemo) {
+    console.log(`*** --live-demo ACTIVE: the Bybit leg of any route through Bybit is a REAL order on Bybit Demo Trading (play funds, $${Math.min(config.demoTradeUsd, config.maxTradeUsd)} per trade, max ${config.demoMaxOrdersPerMin} orders/min). The other leg stays simulated. Routes not involving Bybit remain paper. ***`);
+  }
   if (stressTest) {
     console.log("*** --stress-test ACTIVE: leg fills are being synthetically corrupted to exercise the FR-5.4 unwind path. Not real market behavior. ***");
     console.log("*** Expect the FR-8.5 auto kill switch to trip quickly under stress-test; that is the safety net working. ***");
@@ -110,10 +136,11 @@ async function runPaperMode(stressTest: boolean): Promise<void> {
   const scanLoop = setInterval(async () => {
     killSwitch.pollFileFlag();
 
-    const trades = await runPaperTradingCycle(ingestion, pnlTracker, unwindTracker, { capital, risk, kill: killSwitch }, { injectFailures: stressTest });
+    const trades = await runPaperTradingCycle(ingestion, pnlTracker, unwindTracker, { capital, risk, kill: killSwitch }, { injectFailures: stressTest, bybitLive });
     for (const t of trades) {
       const sign = t.realizedPnlUsd >= 0 ? "+" : "";
-      const mismatch = Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9 ? " [LEG MISMATCH -> UNWOUND]" : "";
+      const mismatch = (Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9 ? " [LEG MISMATCH -> UNWOUND]" : "") +
+        (t.demoOrders ? ` [REAL bybit demo: ${t.demoOrders.map((o) => `${o.role} ${o.status}${o.orderId ? " " + o.orderId : ""}${o.error ? " (" + o.error + ")" : ""}`).join("; ")}]` : "");
       console.log(
         `[${new Date().toISOString()}] paper trade: ${t.assetId} buy@${t.buyVenueId} -> sell@${t.sellVenueId}, ` +
           `matched=${t.matchedQty.toFixed(4)}, theoretical=${t.theoreticalNetSpreadBps.toFixed(1)}bps, realized=${sign}$${t.realizedPnlUsd.toFixed(4)}${mismatch}`,
@@ -173,7 +200,7 @@ async function runPaperMode(stressTest: boolean): Promise<void> {
 async function main() {
   const mode = parseMode();
   if (mode === "paper") {
-    await runPaperMode(parseStressTest());
+    await runPaperMode(parseStressTest(), parseLiveDemo());
     return;
   }
   await runDetectMode();

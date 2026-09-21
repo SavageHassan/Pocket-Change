@@ -18,6 +18,7 @@
     "test:mock-atomic-swap": "tsx scripts/mock-test-atomic-swap.ts",
     "test:mock-bybit": "tsx scripts/mock-test-bybit.ts",
     "test:m4": "tsx scripts/test-m4.ts",
+    "test:mock-demo": "tsx scripts/mock-test-demo.ts",
     "bridge": "tsx scripts/bridge.ts"
   },
   "dependencies": {

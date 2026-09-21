@@ -34,7 +34,7 @@ interface BybitOrderCreateResult {
 }
 
 interface BybitOrderRealtimeResult {
-  list: Array<{ side: "Buy" | "Sell"; qty: string; cumExecQty: string; orderStatus: string }>;
+  list: Array<{ side: "Buy" | "Sell"; qty: string; cumExecQty: string; avgPrice?: string; orderStatus: string }>;
 }
 
 /**
@@ -205,6 +205,7 @@ export class BybitAdapter implements VenueAdapter {
       side: order.side === "Buy" ? "buy" : "sell",
       requestedQty: Number(order.qty),
       filledQty: Number(order.cumExecQty ?? 0),
+      avgPrice: order.avgPrice ? Number(order.avgPrice) : undefined,
       status: statusMap[order.orderStatus] ?? "pending",
       timestamp: Date.now(),
     };

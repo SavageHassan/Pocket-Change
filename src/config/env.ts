@@ -51,6 +51,10 @@ export const config = {
   venueRecoverySuccesses: num("VENUE_RECOVERY_SUCCESSES", 3), // clean polls before a halted venue resumes
   reconcileTolerancePct: num("RECONCILE_TOLERANCE_PCT", 0.5), // balance drift (% of venue value) that halts a venue
 
+  // --live-demo: real orders on Bybit Demo Trading (play funds)
+  demoTradeUsd: num("DEMO_TRADE_USD", 50),
+  demoMaxOrdersPerMin: num("DEMO_MAX_ORDERS_PER_MIN", 6),
+
   // M3: Bybit Demo Trading (api-demo.bybit.com) — a real order-submission
   // sandbox with no real funds, NOT the same as a mainnet key. Absent by
   // default; execution scripts refuse to run without it rather than

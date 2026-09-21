@@ -568,6 +568,7 @@
     var ev = e.event;
     if (ev === "system" && e.venue) { B.polls++; B.pollBy[e.venue] = (B.pollBy[e.venue] || 0) + 1; }
     else if (ev === "system") { bLine(e.time, "sys", e.msg); }
+    else if (ev === "live_demo") { B.liveDemo = true; bLine(e.time, "trade", "LIVE-DEMO on: Bybit legs are real orders on Bybit Demo Trading (play funds)"); }
     else if (ev === "kill_switch") { bLine(e.time, "fail", "kill switch: " + e.reason); }
     else if (ev === "opportunity_detected") {
       B.oppCount++; B.opps[e.assetId + e.buyVenueId + e.sellVenueId] = e;
@@ -595,7 +596,7 @@
     $("botOff").hidden = B.on; $("botOn").hidden = !B.on;
     var pill = $("botPill");
     if (!B.on) { pill.className = "pill warn"; pill.textContent = "not connected"; return; }
-    pill.className = "pill " + (B.active ? "live" : "warn"); pill.textContent = B.active ? "bot running" : "connected, bot idle";
+    pill.className = "pill " + (B.active ? "live" : "warn"); pill.textContent = B.active ? (B.liveDemo ? "bot running \u00b7 live-demo" : "bot running") : "connected, bot idle";
     $("bPolls").textContent = B.polls;
     $("bPollsSub").textContent = Object.keys(B.pollBy).map(function (v) { return (VN[v] || v) + " " + B.pollBy[v]; }).join(" · ") || " ";
     $("bOpps").textContent = B.oppCount;
@@ -614,7 +615,7 @@
     $("bTradeRows").innerHTML = B.trades.length ? B.trades.map(function (t) {
       var mism = Math.abs(t.buyFill.filledQty - t.sellFill.filledQty) > 1e-9;
       return "<tr><td>" + String(t.time).substr(11, 8) + "</td><td><span class='route'>" + t.assetId + " " + dotHtml(t.buyVenueId) + (VN[t.buyVenueId] || t.buyVenueId) + "<span class='arrow'>→</span>" + dotHtml(t.sellVenueId) + (VN[t.sellVenueId] || t.sellVenueId) + "</span></td>" +
-        "<td class='n'>" + fmt(t.matchedQty, 4) + "</td><td class='n " + (t.realizedPnlUsd < 0 ? "bad" : "good") + "'>" + usd(t.realizedPnlUsd) + "</td><td>" + (mism ? '<span class="tag trade">unwound</span>' : '<span class="tag below">clean match</span>') + "</td></tr>";
+        "<td class='n'>" + fmt(t.matchedQty, 4) + "</td><td class='n " + (t.realizedPnlUsd < 0 ? "bad" : "good") + "'>" + usd(t.realizedPnlUsd) + "</td><td>" + (mism ? '<span class="tag trade">unwound</span>' : '<span class="tag below">clean match</span>') + (t.demoOrders ? ' <span class="tag stale" title="' + esc(t.demoOrders.map(function (o) { return o.role + " " + o.status + (o.orderId ? " " + o.orderId : ""); }).join("; ")) + '">bybit leg REAL (demo)</span>' : "") + "</td></tr>";
     }).join("") : "<tr><td colspan='5' class='empty'>No paper trades yet.</td></tr>";
     var cp = B.cap;
     $("capBlock").hidden = !cp;

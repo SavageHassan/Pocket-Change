@@ -12,6 +12,7 @@ import { scanForOpportunities } from "./opportunityDetector.js";
 import { simulateCexFill, simulateDexFill } from "./fillSimulator.js";
 import { simulateUnwind } from "./unwindSimulator.js";
 import { maybeInjectFailure } from "./legFailureInjector.js";
+import { BybitDemoExecutor } from "../execution/bybitDemoExecutor.js";
 
 /**
  * M1 (FR-9.1): re-price every opportunity that clears the threshold through
@@ -42,6 +43,8 @@ function explicitFeeUsd(quote: NormalizedQuote, filledQty: number, avgPrice: num
 
 export interface PaperTradingOptions {
   injectFailures?: boolean;
+  /** --live-demo: the Bybit leg of any route through Bybit becomes a REAL order on Bybit Demo Trading (play funds). */
+  bybitLive?: BybitDemoExecutor;
 }
 
 export interface RiskContext {
@@ -98,8 +101,15 @@ export async function runPaperTradingCycle(
     const sellEntry = await ingestion.getQuote(opp.sellVenueId, opp.assetId);
     if (!buyEntry || !sellEntry) continue;
 
-    const sizeUsd = Math.min(config.paperTradeSizeUsd, config.maxTradeUsd);
-    const qtyBase = sizeUsd / opp.buyPrice;
+    const liveRoute = !!options.bybitLive && (opp.buyVenueId === "bybit" || opp.sellVenueId === "bybit");
+    if (liveRoute && !options.bybitLive!.canPlace()) {
+      logReject("demo-rate", { reason: `live-demo order rate limit (${config.demoMaxOrdersPerMin}/min) reached, routes through Bybit wait` });
+      continue;
+    }
+    const sizeUsd = Math.min(liveRoute ? config.demoTradeUsd : config.paperTradeSizeUsd, config.maxTradeUsd);
+    let qtyBase = sizeUsd / opp.buyPrice;
+    if (liveRoute) qtyBase = BybitDemoExecutor.roundQty(qtyBase); // both legs use the lot-rounded size so they're comparable
+    const demoOrders: NonNullable<PaperTrade["demoOrders"]> = [];
 
     const pre = ctx.capital.preTrade(opp.buyVenueId, opp.sellVenueId, opp.assetId, qtyBase, opp.buyPrice, buyEntry.quote.feeSchedule.takerBps);
     if (!pre.ok) {
@@ -110,12 +120,29 @@ export async function runPaperTradingCycle(
     let buyFill = isDex(buyEntry.quote) ? simulateDexFill(buyEntry.quote, "buy", qtyBase) : simulateCexFill(buyEntry.quote, "buy", qtyBase);
     let sellFill = isDex(sellEntry.quote) ? simulateDexFill(sellEntry.quote, "sell", qtyBase) : simulateCexFill(sellEntry.quote, "sell", qtyBase);
 
-    if (options.injectFailures) {
+    if (options.injectFailures && !liveRoute) {
       if (Math.random() < 0.5) {
         buyFill = maybeInjectFailure(buyFill);
       } else {
         sellFill = maybeInjectFailure(sellFill);
       }
+    }
+
+    if (liveRoute) {
+      // The Bybit leg is a REAL order on Bybit Demo Trading; whatever it actually does replaces the simulated fill.
+      const bybitIsBuy = opp.buyVenueId === "bybit";
+      const real = await options.bybitLive!.placeAndAwait(opp.assetId, bybitIsBuy ? "buy" : "sell", qtyBase);
+      demoOrders.push({ venue: "bybit", orderId: real.orderId, role: "leg", status: real.status, error: real.error });
+      const simulated = bybitIsBuy ? buyFill : sellFill;
+      const replaced = {
+        requestedQty: qtyBase,
+        filledQty: real.filled,
+        avgPrice: real.avg || (real.filled > 0 ? simulated.avgPrice : 0),
+        fullyFilled: real.filled >= qtyBase - 1e-9,
+      };
+      if (bybitIsBuy) buyFill = replaced;
+      else sellFill = replaced;
+      logger.system("live-demo bybit leg", { orderId: real.orderId, status: real.status, requested: qtyBase, filled: real.filled, avg: real.avg, error: real.error });
     }
 
     if (buyFill.filledQty <= 0 && sellFill.filledQty <= 0) continue;
@@ -140,6 +167,7 @@ export async function runPaperTradingCycle(
       feesUsd,
       realizedPnlUsd: 0,
     };
+    if (demoOrders.length) trade.demoOrders = demoOrders;
 
     ctx.capital.applyTrade(
       opp.buyVenueId,
@@ -152,6 +180,18 @@ export async function runPaperTradingCycle(
     );
 
     const unwind = simulateUnwind(trade.id, opp.assetId, buyEntry.quote, sellEntry.quote, buyFill, sellFill);
+    if (unwind && liveRoute && unwind.venueId === "bybit") {
+      // The excess sits on Bybit, so the offsetting order is ALSO a real demo order, not a simulation.
+      const want = unwind.unwindFill.requestedQty;
+      const real = await options.bybitLive!.placeAndAwait(opp.assetId, unwind.side, want);
+      demoOrders.push({ venue: "bybit", orderId: real.orderId, role: "unwind", status: real.status, error: real.error });
+      const avg = real.avg || (real.filled > 0 ? unwind.unwindFill.avgPrice : 0);
+      unwind.unwindFill = { requestedQty: want, filledQty: real.filled, avgPrice: avg, fullyFilled: want - real.filled <= 0.001 + 1e-9 };
+      unwind.fullyFlattened = unwind.unwindFill.fullyFilled;
+      unwind.event.realizedLoss = unwind.side === "sell" ? real.filled * (unwind.referencePrice - avg) : real.filled * (avg - unwind.referencePrice);
+      unwind.event.actionTaken = `REAL demo order (${real.status}): ${unwind.side === "sell" ? "sold" : "bought back"} ${real.filled.toFixed(3)} ${opp.assetId} on bybit to flatten` +
+        (unwind.fullyFlattened ? "" : ` — INCOMPLETE, wanted ${want.toFixed(3)}${real.error ? ` (${real.error})` : ""}`);
+    }
     let unwindLoss = 0;
     if (unwind) {
       unwindLoss = unwind.event.realizedLoss;

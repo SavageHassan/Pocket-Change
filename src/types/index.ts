@@ -36,6 +36,7 @@ export interface Leg {
   side: LegSide;
   requestedQty: number;
   filledQty: number;
+  avgPrice?: number; // average fill price, when the venue reports it
   status: LegStatus;
   timestamp: number;
 }
@@ -156,6 +157,8 @@ export interface PaperTrade {
   matchedQty: number; // min(buyFill.filledQty, sellFill.filledQty) — the unmatched remainder is a hypothetical FR-5.4 unwind case
   feesUsd: number;
   realizedPnlUsd: number;
+  // Set only in --live-demo mode: legs that were REAL orders on a venue's demo/sandbox account.
+  demoOrders?: Array<{ venue: string; orderId: string; role: "leg" | "unwind"; status: string; error?: string }>;
 }
 
 export class NotImplementedError extends Error {

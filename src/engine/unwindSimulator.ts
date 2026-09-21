@@ -22,6 +22,7 @@ export interface UnwindResult {
   fullyFlattened: boolean;
   venueId: string;
   side: "buy" | "sell";
+  referencePrice: number; // the price the unmatched portion 'should' have got; loss is measured against it
 }
 
 /**
@@ -84,5 +85,6 @@ export function simulateUnwind(
     fullyFlattened,
     venueId: netExposure > 0 ? buyVenueQuote.venueId : sellVenueQuote.venueId,
     side: netExposure > 0 ? "sell" : "buy",
+    referencePrice: netExposure > 0 ? sellFill.avgPrice || buyFill.avgPrice : buyFill.avgPrice || sellFill.avgPrice,
   };
 }

@@ -71,6 +71,37 @@ mainnet trading endpoint.
 
 **Not built (needs your decision, and real credentials):** live order submission on a real exchange, real balance fetching, and real rebalancing transfers. The SRS's "small real capital" part of M4 depends on those.
 
+## Real orders, fake money (`--live-demo`)
+
+```bash
+npm start -- --mode=paper --live-demo
+```
+
+The Bybit leg of any route through Bybit becomes a **real order on Bybit Demo
+Trading** (their sandbox, play funds). You get real order IDs and real fills.
+The other venue's leg stays simulated: MEXC has no sandbox and Raydium's pools
+aren't on devnet, so there is nowhere real to send it. Routes that don't involve
+Bybit stay paper. Every trade record says which legs were real.
+
+- **Real unwind:** if the Bybit leg over-fills relative to the other leg, the
+  offsetting order is also a real demo order; if the excess sits on the
+  simulated venue, the unwind is simulated.
+- **Guards:** the M4 kill switches, venue halts, custody cap and capital
+  pre-checks all still apply; orders are limited to `DEMO_TRADE_USD` (50) each and
+  `DEMO_MAX_ORDERS_PER_MIN` (6). `--stress-test` doesn't inject failures into real legs.
+- **Startup check:** it calls your demo account's balance endpoint first and
+  exits with the reason if the key is missing or rejected. It has no path to any
+  real-money host: the adapter only knows `api-demo.bybit.com`.
+- **You need:** a Demo Trading API key from your own Bybit account (account menu
+  -> Demo Trading -> API) in `.env` as `BYBIT_API_KEY` / `BYBIT_API_SECRET`.
+- **Verified so far:** `npm run test:mock-demo` (18 checks against a fake Bybit
+  account: real-order wiring, real unwind, rejection, rate limit) and the
+  refusal without a key. **Not yet verified against Bybit's real demo API.**
+  Their docs don't clearly list plain spot orders as supported in Demo Trading,
+  so the first real run may be rejected; the run then shows Bybit's own
+  error, and the trade is handled as a failed leg. Selling SOL also needs SOL in
+  the demo account; if it has none, sell legs will be rejected and unwound.
+
 ## Watching the real bot on the dashboard
 
 The dashboard's "Your real bot" panel reads your bot's own event log through
